@@ -332,20 +332,58 @@ if [ $? -eq 0 ]; then
         DMG_NAME="ScreenJournal Tracker_0.1.0_aarch64.dmg"
         DMG_PATH="$DMG_DIR/$DMG_NAME"
         
+        # Unmount any existing DMG volumes with the same name to avoid "Resource busy" error
+        VOLUME_NAME="ScreenJournal Tracker"
+        echo -e "${YELLOW}   Checking for mounted DMG volumes...${NC}"
+        # Get all mounted volumes matching the name
+        MOUNTED_VOLUMES=$(hdiutil info | grep -B 5 "$VOLUME_NAME" | grep "/Volumes" | awk '{print $3}' | tr '\n' ' ')
+        if [ -n "$MOUNTED_VOLUMES" ]; then
+            echo -e "${YELLOW}   Unmounting existing DMG volumes: $MOUNTED_VOLUMES${NC}"
+            for vol in $MOUNTED_VOLUMES; do
+                hdiutil detach "$vol" 2>/dev/null || true
+            done
+            sleep 2
+        fi
+        
         # Remove old DMG if it exists
         if [ -f "$DMG_PATH" ]; then
+            echo -e "${YELLOW}   Removing old DMG file...${NC}"
             rm -f "$DMG_PATH"
+            sleep 1
         fi
         
         # Create DMG using hdiutil
         mkdir -p "$DMG_DIR"
         
-        # Create a temporary directory for DMG contents
-        TEMP_DMG_DIR=$(mktemp -d)
+        # Create a temporary directory for DMG contents with unique name
+        TEMP_DMG_DIR=$(mktemp -d -t dmg.XXXXXX)
         cp -R "$APP_BUNDLE_PATH" "$TEMP_DMG_DIR/"
         
-        # Create DMG
-        hdiutil create -volname "ScreenJournal Tracker" -srcfolder "$TEMP_DMG_DIR" -ov -format UDZO "$DMG_PATH"
+        # Create DMG with retry logic
+        MAX_RETRIES=3
+        RETRY_COUNT=0
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if hdiutil create -volname "$VOLUME_NAME" -srcfolder "$TEMP_DMG_DIR" -ov -format UDZO "$DMG_PATH" 2>&1; then
+                break
+            else
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                    echo -e "${YELLOW}   Retry $RETRY_COUNT/$MAX_RETRIES: Resource busy, waiting...${NC}"
+                    sleep 2
+                    # Try to unmount any volumes again
+                    MOUNTED_VOLUMES=$(hdiutil info | grep -B 5 "$VOLUME_NAME" | grep "/Volumes" | awk '{print $3}' | tr '\n' ' ')
+                    if [ -n "$MOUNTED_VOLUMES" ]; then
+                        for vol in $MOUNTED_VOLUMES; do
+                            hdiutil detach "$vol" 2>/dev/null || true
+                        done
+                    fi
+                else
+                    echo -e "${RED}   ❌ Failed to create DMG after $MAX_RETRIES attempts${NC}"
+                    rm -rf "$TEMP_DMG_DIR"
+                    exit 1
+                fi
+            fi
+        done
         
         # Clean up temp directory
         rm -rf "$TEMP_DMG_DIR"
