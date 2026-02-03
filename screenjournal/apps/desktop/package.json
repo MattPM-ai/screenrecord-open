@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
+    "build:frontend": "bash scripts/build-frontend.sh",
     "export": "next build && next export",
     "start": "next start",
     "lint": "eslint",

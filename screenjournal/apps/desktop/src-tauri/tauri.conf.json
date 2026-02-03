@@ -7,7 +7,7 @@
     "frontendDist": "../out",
     "devUrl": "http://localhost:3000",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": "npm run build:frontend"
   },
   "app": {
     "windows": [
@@ -58,7 +58,7 @@
     "macOS": {
       "minimumSystemVersion": "10.13",
       "entitlements": "./entitlements.plist",
-      "signingIdentity": "Developer ID Application: Chomtana CHANJARASWICHAI (2N4Z8N5N6A)"
+      "signingIdentity": "-"
     }
   }
 }

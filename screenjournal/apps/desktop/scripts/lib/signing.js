@@ -310,11 +310,11 @@ function signDirectory(dir, entitlementsPath, options = {}) {
     for (const binaryPath of regularBinaries) {
       try {
         const result = signBinary(binaryPath, entitlementsPath, identity);
-        
-        if (result.skipped) {
-          results.skipped++;
-        } else if (result.success) {
-          if (verbose) {
+      
+      if (result.skipped) {
+        results.skipped++;
+      } else if (result.success) {
+        if (verbose) {
             console.log(`  ✓ Signed: ${path.relative(dir, binaryPath)}`);
           }
           results.success++;
@@ -395,9 +395,9 @@ function signDirectory(dir, entitlementsPath, options = {}) {
                     } catch (e) {
                       // Ignore verification errors
                     }
-                  }
-                  results.success++;
-                } else {
+        }
+        results.success++;
+      } else {
                   if (verbose) {
                     console.warn(`  ⚠ Failed to sign framework binary: ${path.relative(dir, binaryPath)}: ${result.error}`);
                   }

@@ -152,7 +152,7 @@ function main() {
 
   // Clone current environment
   let env = { ...process.env };
-  
+
   // For build command, temporarily disable Tauri's automatic notarization
   // We'll handle notarization manually after signing all binaries
   if (args[0] === 'build' && process.platform === 'darwin') {

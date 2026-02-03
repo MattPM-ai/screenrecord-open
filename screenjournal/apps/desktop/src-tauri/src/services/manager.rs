@@ -582,40 +582,40 @@ pub async fn start_chat_agent(app_handle: AppHandle) -> Result<(), String> {
     // Check if standalone executable exists
     if !chat_agent_exe.exists() {
         // Fallback: try Python venv approach (for development)
-        let venv_dir = resource_dir.join("python").join("sj-tracker-chat-agent-venv");
-        let server_script = resource_dir.join("python").join("sj-tracker-chat-agent").join("server.py");
-        
+    let venv_dir = resource_dir.join("python").join("sj-tracker-chat-agent-venv");
+    let server_script = resource_dir.join("python").join("sj-tracker-chat-agent").join("server.py");
+    
         if venv_dir.exists() && server_script.exists() {
             log::info!("Using Python venv approach (development mode)");
-            let python_exe = if cfg!(target_os = "windows") {
-                venv_dir.join("Scripts").join("python.exe")
-            } else {
-                venv_dir.join("bin").join("python3")
-            };
-            
-            if !python_exe.exists() {
-                return Err(format!("Python executable not found at: {:?}", python_exe));
-            }
-            
-            let mut cmd = TokioCommand::new(&python_exe);
-            cmd.arg(&server_script);
-            cmd.current_dir(app_data_dir.clone());
-            cmd.env("BACKEND_URL", "http://localhost:8085");
-            cmd.env("CHAT_AGENT_PORT", "8087");
-            cmd.env("HOST", "0.0.0.0");
-            cmd.stdout(Stdio::piped());
-            cmd.stderr(Stdio::piped());
-            
-            let child = cmd.spawn().map_err(|e| {
-                format!("Failed to start chat agent: {}", e)
-            })?;
-            
-            {
-                let mut python_processes = PYTHON_PROCESSES.lock().unwrap();
-                python_processes.push(child);
-            }
-            
-            sleep(Duration::from_secs(2)).await;
+    let python_exe = if cfg!(target_os = "windows") {
+        venv_dir.join("Scripts").join("python.exe")
+    } else {
+        venv_dir.join("bin").join("python3")
+    };
+    
+    if !python_exe.exists() {
+        return Err(format!("Python executable not found at: {:?}", python_exe));
+    }
+    
+    let mut cmd = TokioCommand::new(&python_exe);
+    cmd.arg(&server_script);
+    cmd.current_dir(app_data_dir.clone());
+    cmd.env("BACKEND_URL", "http://localhost:8085");
+    cmd.env("CHAT_AGENT_PORT", "8087");
+    cmd.env("HOST", "0.0.0.0");
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+    
+    let child = cmd.spawn().map_err(|e| {
+        format!("Failed to start chat agent: {}", e)
+    })?;
+    
+    {
+        let mut python_processes = PYTHON_PROCESSES.lock().unwrap();
+        python_processes.push(child);
+    }
+    
+    sleep(Duration::from_secs(2)).await;
             log::info!("Chat agent started (venv mode)");
             return Ok(());
         }
