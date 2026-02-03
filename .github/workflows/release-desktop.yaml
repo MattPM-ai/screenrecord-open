@@ -282,39 +282,10 @@ jobs:
       # =========================================================================
       # Sign External Binaries (FFmpeg and ActivityWatch)
       # =========================================================================
-      - name: Recursively Sign Everything (Deep)
-        if: matrix.platform == 'macos-latest'
-        env:
-          IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          ENTITLEMENTS: "screenjournal/apps/desktop/src-tauri/entitlements.plist"
-        run: |
-          echo "Deep signing all resources in CWD..."
-          
-          # 1. Remove Python to prevent signing ambiguity
-          # We search from "." (current dir) but keep the specific path match to avoid deleting the wrong Python
-          find . -path "*/Python.framework/Python" -type f -exec sh -c '
-            rm "$1"
-            echo "Removed: $1"
-          ' -- {} \;
-          
-          # 2. Find all executable files in CWD
-          # Changed search path to "." and removed the "-path */darwin/*" restriction
-          find . -type f \( -perm +111 -o -name "*.dylib" -o -name "*.so" \) ! -name ".*" | while read binary; do
-            echo "Signing dependency: $binary"
-            codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" -s "$IDENTITY" "$binary"
-          done
-          
-          # 3. Restore Python
-          # NOTE: This logic relies on the directory structure. 
-          # Since the original file was deleted, "find" might not locate it to execute the restore command 
-          # unless you target the directory or a backup file. 
-          # Below is the logic adapted to ".", but see the warning below.
-          find . -path "*/Python.framework/Versions/Current" -type d -exec sh -c '
-            if [ ! -f "$1/Python" ]; then
-                cp "$1/../Current/Python" "$1/Python"
-                echo "Restored Python in: $1"
-            fi
-          ' -- {} \;
+      # NOTE: Signing is now handled by build-bundled.sh at the end of the build process
+      # This step was removed to avoid interfering with PyInstaller builds
+      # - name: Recursively Sign Everything (Deep)
+      #   ... (removed - signing happens in build-bundled.sh)
 
       # =========================================================================
       # Make build script executable and run it
