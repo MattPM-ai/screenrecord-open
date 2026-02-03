@@ -282,10 +282,54 @@ jobs:
       # =========================================================================
       # Sign External Binaries (FFmpeg and ActivityWatch)
       # =========================================================================
-      # NOTE: Signing is now handled by build-bundled.sh at the end of the build process
-      # This step was removed to avoid interfering with PyInstaller builds
-      # - name: Recursively Sign Everything (Deep)
-      #   ... (removed - signing happens in build-bundled.sh)
+      # NOTE: We sign ActivityWatch/FFmpeg BEFORE bundling to ensure Python.framework
+      # symlinks are properly handled. This must happen before build-bundled.sh runs
+      # to avoid interfering with PyInstaller, but AFTER setup-aw/setup-ffmpeg.
+      - name: Sign ActivityWatch and FFmpeg Binaries
+        if: matrix.platform == 'macos-latest'
+        env:
+          IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          ENTITLEMENTS: "screenjournal/apps/desktop/src-tauri/entitlements.plist"
+        run: |
+          echo "🔏 Signing ActivityWatch and FFmpeg binaries (before bundling)..."
+          
+          # Sign ActivityWatch binaries (targeted - only in resources directory)
+          AW_RESOURCES="screenjournal/apps/desktop/src-tauri/resources/activitywatch"
+          if [ -d "$AW_RESOURCES" ]; then
+            echo "  📦 Signing ActivityWatch binaries..."
+            # Remove Python.framework/Python symlinks to prevent signing ambiguity
+            find "$AW_RESOURCES" -path "*/Python.framework/Python" -type f -exec sh -c '
+              rm "$1"
+              echo "    Removed: $1"
+            ' -- {} \;
+            
+            # Sign all executables in ActivityWatch resources
+            find "$AW_RESOURCES" -type f \( -perm +111 -o -name "*.dylib" \) ! -name ".*" | while read binary; do
+              echo "    Signing: $(basename $binary)"
+              codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" -s "$IDENTITY" "$binary"
+            done
+            
+            # Restore Python.framework/Python symlinks
+            find "$AW_RESOURCES" -path "*/Python.framework/Versions/Current" -type d -exec sh -c '
+              if [ ! -f "$1/Python" ]; then
+                cp "$1/../Current/Python" "$1/Python" 2>/dev/null || true
+              fi
+            ' -- {} \;
+            echo "  ✅ ActivityWatch binaries signed"
+          fi
+          
+          # Sign FFmpeg binaries (targeted - only in resources directory)
+          FFMPEG_RESOURCES="screenjournal/apps/desktop/src-tauri/resources/ffmpeg"
+          if [ -d "$FFMPEG_RESOURCES" ]; then
+            echo "  📦 Signing FFmpeg binaries..."
+            find "$FFMPEG_RESOURCES" -type f \( -perm +111 -o -name "*.dylib" \) ! -name ".*" | while read binary; do
+              echo "    Signing: $(basename $binary)"
+              codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" -s "$IDENTITY" "$binary"
+            done
+            echo "  ✅ FFmpeg binaries signed"
+          fi
+          
+          echo "✅ External binaries signed successfully"
 
       # =========================================================================
       # Make build script executable and run it
