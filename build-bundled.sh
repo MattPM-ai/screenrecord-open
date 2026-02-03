@@ -332,9 +332,11 @@ echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC
 # Local builds use ad-hoc signing ("-") by default in tauri.conf.json
 if [ -n "$APPLE_SIGNING_IDENTITY" ] && [ "$APPLE_SIGNING_IDENTITY" != "-" ]; then
     echo -e "${YELLOW}🔐 Setting signing identity for CI build: $APPLE_SIGNING_IDENTITY${NC}"
-    node scripts/set-signing-identity.js "$APPLE_SIGNING_IDENTITY"
-    # Restore ad-hoc signing after build (for local development)
-    trap 'node scripts/set-signing-identity.js "-"' EXIT
+    DESKTOP_DIR="$(pwd)"
+    SIGNING_SCRIPT="$DESKTOP_DIR/scripts/set-signing-identity.js"
+    node "$SIGNING_SCRIPT" "$APPLE_SIGNING_IDENTITY"
+    # Note: We don't restore to "-" in CI since the config file is in a temporary build environment
+    # For local builds, the default is already "-" so no restoration needed
 fi
 
 npm run tauri:build
