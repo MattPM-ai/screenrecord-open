@@ -16,7 +16,42 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
+# Memory optimization: Set Node.js memory limit to prevent OOM kills
+# Default to 2GB (very conservative - Next.js 16 with webpack is memory-intensive)
+# Can be overridden with NODE_MEMORY_LIMIT environment variable
+# If still getting killed, try: NODE_MEMORY_LIMIT=1536 ./build.sh
+NODE_MEMORY_LIMIT="${NODE_MEMORY_LIMIT:-2048}"
+export NODE_OPTIONS="--max-old-space-size=${NODE_MEMORY_LIMIT}"
+
+# Rust build memory optimization: Limit parallel jobs to reduce memory pressure
+# Default to half of CPU cores to leave memory for other processes
+RUST_JOBS="${RUST_JOBS:-$(($(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 8) / 2))}"
+export CARGO_BUILD_JOBS="${RUST_JOBS}"
+
 echo -e "${GREEN}🔨 Building ScreenJournal Productivity Tracker System${NC}"
+NODE_GB=$((NODE_MEMORY_LIMIT / 1024))
+
+# Check available memory (macOS)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    TOTAL_MEM=$(sysctl -n hw.memsize 2>/dev/null || echo 0)
+    TOTAL_GB=$((TOTAL_MEM / 1024 / 1024 / 1024))
+    if [ $TOTAL_GB -gt 0 ]; then
+        # Try to get available memory (macOS)
+        FREE_MEM=$(vm_stat | grep "Pages free" | awk '{print $3}' | sed 's/\.//')
+        if [ -n "$FREE_MEM" ]; then
+            # Pages are typically 4KB on macOS
+            FREE_MB=$((FREE_MEM * 4 / 1024))
+            FREE_GB=$((FREE_MB / 1024))
+            echo -e "${YELLOW}💾 System RAM: ${TOTAL_GB}GB total, ~${FREE_GB}GB free${NC}"
+        else
+            echo -e "${YELLOW}💾 System RAM: ${TOTAL_GB}GB total${NC}"
+        fi
+    fi
+fi
+
+echo -e "${YELLOW}📊 Memory settings: Node.js=${NODE_MEMORY_LIMIT}MB (${NODE_GB}GB), Rust jobs=${RUST_JOBS}${NC}"
+echo -e "${YELLOW}💡 If build is killed, try: NODE_MEMORY_LIMIT=2048 ./build.sh${NC}"
+echo -e "${YELLOW}⚠️  Make sure Cursor/IDE isn't using excessive memory before building${NC}"
 echo ""
 
 # Function to check if a command exists
@@ -110,7 +145,38 @@ if [ ! -d node_modules ]; then
     npm install
 fi
 # Build Next.js first
-npm run build
+# Ensure NODE_OPTIONS is set (in case it wasn't inherited)
+export NODE_OPTIONS="--max-old-space-size=${NODE_MEMORY_LIMIT}"
+echo -e "${YELLOW}🔧 Using NODE_OPTIONS: ${NODE_OPTIONS}${NC}"
+echo -e "${YELLOW}🔧 Memory limit: ${NODE_MEMORY_LIMIT}MB (${NODE_GB}GB)${NC}"
+
+# Check memory before build (macOS)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo -e "${YELLOW}📊 Memory check before build:${NC}"
+    vm_stat | head -5
+    echo ""
+fi
+
+# Try building without --webpack flag first (uses default bundler, more memory-efficient)
+# Only fall back to --webpack if the default build fails
+# Use npx with explicit node args to ensure memory limit is applied
+echo -e "${YELLOW}🔧 Attempting build without --webpack (more memory-efficient)...${NC}"
+if ! NODE_OPTIONS="--max-old-space-size=${NODE_MEMORY_LIMIT}" npx --node-options="--max-old-space-size=${NODE_MEMORY_LIMIT}" next build; then
+    echo -e "${YELLOW}⚠️  Default build failed, trying with --webpack (fallback)...${NC}"
+    if ! NODE_OPTIONS="--max-old-space-size=${NODE_MEMORY_LIMIT}" npx --node-options="--max-old-space-size=${NODE_MEMORY_LIMIT}" next build --webpack; then
+        echo -e "${RED}❌ Build failed${NC}"
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            echo -e "${YELLOW}📊 Memory check after failure:${NC}"
+            vm_stat | head -5
+            echo -e "${YELLOW}💡 If process was killed (Killed: 9), the system ran out of memory${NC}"
+            echo -e "${YELLOW}💡 Solutions:${NC}"
+            echo -e "${YELLOW}   1. Close Cursor and other heavy apps, then retry${NC}"
+            echo -e "${YELLOW}   2. Use lower memory: NODE_MEMORY_LIMIT=1536 ./build.sh${NC}"
+            echo -e "${YELLOW}   3. Use minimal memory: NODE_MEMORY_LIMIT=1024 ./build.sh${NC}"
+        fi
+        exit 1
+    fi
+fi
 # Then build Tauri app
 npm run tauri:build
 if [ $? -eq 0 ]; then

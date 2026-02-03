@@ -320,7 +320,21 @@ if [ -z "$BACKEND_URL" ]; then
 fi
 
 # Run Python agent using the built virtualenv
-"$BUILD_DIR/sj-tracker-chat-agent-venv/bin/python3" server.py > /tmp/sj-chat-agent.log 2>&1 &
+# On macOS, copied venvs have broken Python binary library paths (@executable_path/../Python3)
+# Solution: Use system Python with venv's site-packages in PYTHONPATH
+# Find the actual site-packages directory
+SITE_PACKAGES=$(find "$BUILD_DIR/sj-tracker-chat-agent-venv/lib" -type d -name "site-packages" | head -1)
+if [ -z "$SITE_PACKAGES" ]; then
+    echo -e "${RED}❌ Could not find site-packages in venv${NC}"
+    exit 1
+fi
+
+# Use system Python with venv's site-packages
+# This works around broken library paths in copied venvs on macOS
+export PYTHONPATH="$SITE_PACKAGES:$PYTHONPATH"
+# Also set VIRTUAL_ENV for packages that check it
+export VIRTUAL_ENV="$BUILD_DIR/sj-tracker-chat-agent-venv"
+python3 server.py > /tmp/sj-chat-agent.log 2>&1 &
 CHAT_AGENT_PID=$!
 cd "$SCRIPT_DIR"
 echo -e "${GREEN}✅ Python chat agent started (PID: $CHAT_AGENT_PID)${NC}"

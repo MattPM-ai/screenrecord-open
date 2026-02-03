@@ -104,25 +104,33 @@ deactivate
 cat > chat-agent.spec << 'EOF'
 # -*- mode: python ; coding: utf-8 -*-
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 block_cipher = None
 
-# Collect all langchain.agents submodules to ensure all imports work
-langchain_agents_submodules = collect_submodules('langchain.agents')
+# NEW APPROACH: Use collect_all for more aggressive collection
+# collect_all collects everything including data files, not just Python modules
+# Returns tuple: (datas, binaries, hiddenimports)
+# This is more comprehensive than collect_submodules alone
 
-# Collect all langchain_core submodules - agent.py depends on 129+ langchain_core modules
-# Without these, agent.py fails to load and AgentExecutor is never available
+# Collect ALL langchain.agents (modules + data files)
+langchain_agents_datas, langchain_agents_binaries, langchain_agents_imports = collect_all('langchain.agents')
+
+# Collect ALL langchain_core (modules + data files)  
+langchain_core_datas, langchain_core_binaries, langchain_core_imports = collect_all('langchain_core')
+
+# Also collect submodules explicitly as backup
+langchain_agents_submodules = collect_submodules('langchain.agents')
 langchain_core_submodules = collect_submodules('langchain_core')
 
 a = Analysis(
     ['server.py'],
     pathex=[],
-    binaries=[],
+    binaries=langchain_agents_binaries + langchain_core_binaries,  # Include collected binaries
     datas=[
         ('main.py', '.'),
         ('backend_client.py', '.'),
-    ],
+    ] + langchain_agents_datas + langchain_core_datas,  # Include collected data files
     hiddenimports=[
         'flask',
         'flask_cors',
@@ -144,7 +152,7 @@ a = Analysis(
         'pydantic.fields',
         'main',
         'backend_client',
-    ] + langchain_agents_submodules + langchain_core_submodules,  # Add all collected submodules
+    ] + langchain_agents_imports + langchain_core_imports + langchain_agents_submodules + langchain_core_submodules,  # Add all collected modules
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -305,20 +313,20 @@ fi
 # Copy frontend BEFORE Tauri build (so it's included in the initial bundle)
 # This avoids needing to re-sign and re-notarize
 echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC}"
-cd "$SCRIPT_DIR"
-mkdir -p "$TAURI_RESOURCES_DIR/frontend"
-# Use rsync or cp with -L to follow symlinks and ensure complete copy
-if command -v rsync >/dev/null 2>&1; then
-    rsync -a --copy-links "$SCRIPT_DIR/sj-tracker-frontend/" "$TAURI_RESOURCES_DIR/frontend/sj-tracker-frontend/"
-else
-    # Use cp with -L to follow symlinks
-    cp -RL "$SCRIPT_DIR/sj-tracker-frontend" "$TAURI_RESOURCES_DIR/frontend/"
-fi
-echo -e "${GREEN}✅ Frontend copied to Tauri app${NC}"
-
+    cd "$SCRIPT_DIR"
+    mkdir -p "$TAURI_RESOURCES_DIR/frontend"
+    # Use rsync or cp with -L to follow symlinks and ensure complete copy
+    if command -v rsync >/dev/null 2>&1; then
+        rsync -a --copy-links "$SCRIPT_DIR/sj-tracker-frontend/" "$TAURI_RESOURCES_DIR/frontend/sj-tracker-frontend/"
+    else
+        # Use cp with -L to follow symlinks
+        cp -RL "$SCRIPT_DIR/sj-tracker-frontend" "$TAURI_RESOURCES_DIR/frontend/"
+    fi
+    echo -e "${GREEN}✅ Frontend copied to Tauri app${NC}"
+    
 # Build Tauri app (this will bundle resources, sign, and notarize once)
 # Note: Tauri will create a DMG, but we'll recreate it after notarization
-cd screenjournal/apps/desktop
+    cd screenjournal/apps/desktop
 npm run tauri:build
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ Bundled desktop app built, signed, and notarized${NC}"

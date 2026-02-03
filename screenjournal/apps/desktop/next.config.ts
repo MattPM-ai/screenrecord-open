@@ -14,7 +14,30 @@ const nextConfig: NextConfig = {
   experimental: {
     // This helps prevent Next.js from scanning certain directories
   },
+  // Add empty turbopack config to silence Next.js 16 warning
+  // We're using webpack explicitly via --webpack flag for memory optimization
+  turbopack: {},
   webpack: (config, { isServer, webpack }) => {
+    // Memory optimization: Reduce webpack's memory usage
+    config.optimization = {
+      ...config.optimization,
+      // Reduce memory usage during build
+      moduleIds: 'deterministic',
+      chunkIds: 'deterministic',
+      // Disable expensive optimizations that use more memory
+      removeAvailableModules: false,
+      removeEmptyChunks: false,
+      mergeDuplicateChunks: false,
+    };
+    
+    // Limit webpack parallelism to reduce memory usage
+    // This reduces the number of worker processes spawned
+    // Set to 1 for minimal memory usage (single-threaded, but safer)
+    config.parallelism = 1;
+    
+    // Disable cache to reduce memory usage (slower but uses less RAM)
+    config.cache = false;
+    
     // Externalize Tauri plugins - they're only available in Tauri runtime
     // This prevents Next.js from trying to bundle them during build
     if (!isServer) {
