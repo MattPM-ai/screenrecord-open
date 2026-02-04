@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { register } from '@/lib/authAPI';
+// Note: Registration not available in bundled/local app
 
 function UserRegisterPageContent() {
   const router = useRouter();
@@ -87,15 +87,8 @@ function UserRegisterPageContent() {
     setLoading(true);
 
     try {
-      await register({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        join_code: formData.join_code.trim()
-      });
-      
-      // Redirect to success page after successful registration
-      router.push('/register/success');
+      // For local bundled app, registration is not available
+      throw new Error('Registration is not available in the local bundled app');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {

@@ -21,7 +21,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { login } from '@/lib/authAPI';
+// Login not available in local/bundled app (no auth backend)
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -54,19 +54,9 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    try {
-      await login({
-        email: formData.email.trim(),
-        password: formData.password
-      });
-      
-      // Redirect to profile page after successful login
-      window.location.href = '/profile';
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    // Login not available in local/bundled app
+    setError('Authentication is not available in the local bundled app');
+    setLoading(false);
   };
 
   return (

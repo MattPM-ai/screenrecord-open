@@ -16,8 +16,7 @@
 'use client'
 
 import { useState, FormEvent, useEffect } from 'react'
-import { getProfile } from '@/lib/authAPI'
-import { organisationsAPI, Organisation, OrganisationUser } from '@/lib/organisationsAPI'
+import { getDefaultUser, getDefaultOrganisations, type Organisation, type OrganisationUser } from '@/lib/localTypes'
 
 const GEMINI_API_KEY_STORAGE_KEY = 'gemini_api_key'
 
@@ -122,22 +121,14 @@ export default function WeeklyReportForm({ onSubmit }: WeeklyReportFormProps) {
         setError('')
 
         // Get user profile to retrieve accountId
-        const userProfile = await getProfile()
+        const userProfile = getDefaultUser()
         // Use default account ID (0) for local version if not available
         const accountIdValue = userProfile.account_id ?? 0
         setAccountId(accountIdValue)
 
         // For local version, use default organization instead of fetching from API
         // This avoids 404 errors when the organisations API is not available
-        const defaultOrg: Organisation = {
-          id: 0,
-          name: 'Local Organization',
-          description: 'Default organization for local use',
-          account_id: accountIdValue,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }
-        setOrganisations([defaultOrg])
+        setOrganisations(getDefaultOrganisations(accountIdValue))
         setSelectedOrgId('0')
 
         // Generate weeks for current year
@@ -152,15 +143,7 @@ export default function WeeklyReportForm({ onSubmit }: WeeklyReportFormProps) {
         console.error('Failed to load form data:', err)
         // Even if profile fails, set defaults for local version
         setAccountId(0)
-        const defaultOrg: Organisation = {
-          id: 0,
-          name: 'Local Organization',
-          description: 'Default organization for local use',
-          account_id: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }
-        setOrganisations([defaultOrg])
+        setOrganisations(getDefaultOrganisations(0))
         setSelectedOrgId('0')
         setError('') // Don't show error for local version
       } finally {

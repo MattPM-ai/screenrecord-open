@@ -218,8 +218,8 @@ export function ServiceStartupScreen({
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
       <div className="flex flex-col items-center space-y-8 w-full max-w-md px-6">
         {/* Logo and Title */}
-        <div className="flex flex-col items-center space-y-4">
-          <div className="w-10 h-10">
+        <div className="flex flex-col items-center space-y-6">
+          <div className="w-10 h-10 flex items-center justify-center">
             <svg
               width="40"
               height="90"
@@ -234,7 +234,7 @@ export function ServiceStartupScreen({
               />
             </svg>
           </div>
-          <h1 className="text-2xl font-semibold">ScreenJournal Tracker</h1>
+          <h1 className="text-2xl font-semibold mt-2">ScreenJournal Tracker</h1>
           <p className="text-sm text-muted-foreground">
             {allReady
               ? "All services ready"

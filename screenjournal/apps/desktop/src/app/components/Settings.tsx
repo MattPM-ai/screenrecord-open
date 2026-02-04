@@ -46,7 +46,7 @@ import {
   testConnection,
   validateConfig,
 } from "@/lib/collectorClient";
-import { getAccessToken } from "@/lib/authAPI";
+import { getAccessToken } from "@/lib/localAuth";
 import { Button } from "@repo/ui";
 import { Video, Settings2, HardDrive, Gauge, Cloud, CheckCircle, AlertCircle, Network, X, Loader, Monitor, Sparkles } from "lucide-react";
 import { message } from "@tauri-apps/plugin-dialog";

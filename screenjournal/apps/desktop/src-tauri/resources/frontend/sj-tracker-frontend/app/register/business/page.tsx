@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { registerBusiness } from '@/lib/authAPI';
+// Note: Business registration not available in bundled/local app
 
 export default function BusinessRegisterPage() {
   const [formData, setFormData] = useState({
@@ -47,7 +47,8 @@ export default function BusinessRegisterPage() {
     setLoading(true);
 
     try {
-      await registerBusiness({
+      // For local bundled app, business registration is not available
+      throw new Error('Business registration is not available in the local bundled app');
         name: formData.name,
         email: formData.email,
         password: formData.password

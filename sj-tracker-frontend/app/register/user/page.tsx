@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { register } from '@/lib/authAPI';
+// Registration not available in local/bundled app (no auth backend)
 
 function UserRegisterPageContent() {
   const router = useRouter();
@@ -86,18 +86,8 @@ function UserRegisterPageContent() {
 
     setLoading(true);
 
-    try {
-      await register({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        join_code: formData.join_code.trim()
-      });
-      
-      // Redirect to success page after successful registration
-      router.push('/register/success');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+    // Registration not available in local/bundled app
+    setError('Registration is not available in the local bundled app');
     } finally {
       setLoading(false);
     }

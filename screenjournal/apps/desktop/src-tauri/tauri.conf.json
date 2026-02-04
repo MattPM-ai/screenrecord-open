@@ -14,10 +14,10 @@
       {
         "label": "main",
         "title": "ScreenJournal Tracker",
-        "width": 300,
-        "height": 550,
-        "minWidth": 300,
-        "minHeight": 550,
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
         "resizable": true,
         "fullscreen": false
       }

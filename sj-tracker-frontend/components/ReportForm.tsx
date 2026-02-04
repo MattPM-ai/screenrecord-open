@@ -16,8 +16,7 @@
 'use client'
 
 import { useState, FormEvent, useEffect } from 'react'
-import { getProfile } from '@/lib/authAPI'
-import { organisationsAPI, Organisation, OrganisationUser } from '@/lib/organisationsAPI'
+import { getDefaultUser, getDefaultOrganisation, type Organisation, type OrganisationUser } from '@/lib/localTypes'
 
 const GEMINI_API_KEY_STORAGE_KEY = 'gemini_api_key'
 
@@ -59,9 +58,8 @@ export default function ReportForm({ onSubmit }: ReportFormProps) {
         setLoading(true)
         setError('')
 
-        // Get user profile to retrieve accountId and check ownership
-        const userProfile = await getProfile()
-        // Use default account ID (0) for local version if not available
+        // Use default user for local/bundled app (no auth backend)
+        const userProfile = getDefaultUser()
         const accountIdValue = userProfile.account_id ?? 0
         setAccountId(accountIdValue)
         setIsOwner(userProfile.owner === true)
@@ -69,16 +67,8 @@ export default function ReportForm({ onSubmit }: ReportFormProps) {
         setCurrentUserName(userProfile.name || '')
         setCurrentUserEmail(userProfile.email)
 
-        // For local version, use default organization instead of fetching from API
-        // This avoids 404 errors when the organisations API is not available
-        const defaultOrg: Organisation = {
-          id: 0,
-          name: 'Local Organization',
-          description: 'Default organization for local use',
-          account_id: accountIdValue,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }
+        // Use default organization for local/bundled app
+        const defaultOrg = getDefaultOrganisation(accountIdValue)
         setOrganisations([defaultOrg])
         setSelectedOrgId('0')
         
@@ -86,16 +76,9 @@ export default function ReportForm({ onSubmit }: ReportFormProps) {
         setSelectedUserIds([0])
       } catch (err) {
         console.error('Failed to load form data:', err)
-        // Even if profile fails, set defaults for local version
+        // Set defaults for local version
         setAccountId(0)
-        const defaultOrg: Organisation = {
-          id: 0,
-          name: 'Local Organization',
-          description: 'Default organization for local use',
-          account_id: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }
+        const defaultOrg = getDefaultOrganisation(0)
         setOrganisations([defaultOrg])
         setSelectedOrgId('0')
         setSelectedUserIds([0])

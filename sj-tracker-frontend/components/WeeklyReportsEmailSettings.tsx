@@ -15,7 +15,7 @@
 'use client'
 
 import { useState, useEffect, FormEvent } from 'react'
-import { organisationsAPI, Organisation, OrganisationUser } from '@/lib/organisationsAPI'
+import { getDefaultOrganisation, type Organisation, type OrganisationUser } from '@/lib/localTypes'
 import { optInWeeklyReports, optOutWeeklyReports, getOptedInAccounts, OptedInAccount } from '@/lib/weeklyReportsAPI'
 
 interface WeeklyReportsEmailSettingsProps {
@@ -47,9 +47,8 @@ export default function WeeklyReportsEmailSettings({ accountId, ownerEmail }: We
         setLoading(true)
         setError('')
         
-        // Load organizations
-        const orgsResponse = await organisationsAPI.getOrganisations(0, 100)
-        setOrganisations(orgsResponse.data)
+        // Use default organization for local/bundled app (no auth backend)
+        setOrganisations([getDefaultOrganisation(accountId)])
         
         // Load opted-in accounts
         setLoadingOptedIn(true)
@@ -85,26 +84,8 @@ export default function WeeklyReportsEmailSettings({ accountId, ownerEmail }: We
         setLoadingUsers(true)
         const orgId = Number(selectedOrgId)
         if (!isNaN(orgId)) {
-          // Get all users with pagination
+          // For local/bundled app, no users available (no auth backend)
           const allUsers: OrganisationUser[] = []
-          let page = 0
-          const limit = 100
-          let hasMore = true
-
-          while (hasMore) {
-            const usersResponse = await organisationsAPI.getOrganisationUsersPaginated(orgId, page, limit)
-            if (usersResponse.success && usersResponse.data) {
-              allUsers.push(...usersResponse.data)
-              
-              if (usersResponse.pagination && page < usersResponse.pagination.totalPages - 1) {
-                page++
-              } else {
-                hasMore = false
-              }
-            } else {
-              hasMore = false
-            }
-          }
 
           setUsers(allUsers)
         }

@@ -39,7 +39,7 @@ export const SplashScreenStyles = () => (
       font-size: 20px;
       font-weight: 600;
       color: black;
-      margin-top: 16px;
+      margin-top: 24px;
       margin-bottom: 32px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }

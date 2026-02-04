@@ -16,8 +16,7 @@
 'use client'
 
 import { useState, FormEvent, useEffect } from 'react'
-import { getProfile } from '@/lib/authAPI'
-import { organisationsAPI, Organisation, OrganisationUser } from '@/lib/organisationsAPI'
+import { getDefaultUser, getDefaultOrganisations, type Organisation, type OrganisationUser } from '@/lib/localTypes'
 
 const GEMINI_API_KEY_STORAGE_KEY = 'gemini_api_key'
 
@@ -60,7 +59,7 @@ export default function ReportForm({ onSubmit }: ReportFormProps) {
         setError('')
 
         // Get user profile to retrieve accountId and check ownership
-        const userProfile = await getProfile()
+        const userProfile = getDefaultUser()
         // Use default account ID (0) for local version if not available
         const accountIdValue = userProfile.account_id ?? 0
         setAccountId(accountIdValue)
@@ -71,15 +70,7 @@ export default function ReportForm({ onSubmit }: ReportFormProps) {
 
         // For local version, use default organization instead of fetching from API
         // This avoids 404 errors when the organisations API is not available
-        const defaultOrg: Organisation = {
-          id: 0,
-          name: 'Local Organization',
-          description: 'Default organization for local use',
-          account_id: accountIdValue,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }
-        setOrganisations([defaultOrg])
+        setOrganisations(getDefaultOrganisations(accountIdValue))
         setSelectedOrgId('0')
         
         // Pre-select default user

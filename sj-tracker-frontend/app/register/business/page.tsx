@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { registerBusiness } from '@/lib/authAPI';
+// Registration not available in local/bundled app (no auth backend)
 
 export default function BusinessRegisterPage() {
   const [formData, setFormData] = useState({
@@ -46,17 +46,8 @@ export default function BusinessRegisterPage() {
 
     setLoading(true);
 
-    try {
-      await registerBusiness({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password
-      });
-      
-      // Redirect to profile page after successful business registration
-      router.push('/profile');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+    // Registration not available in local/bundled app
+    setError('Registration is not available in the local bundled app');
     } finally {
       setLoading(false);
     }

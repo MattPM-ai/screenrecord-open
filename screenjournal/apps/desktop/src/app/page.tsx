@@ -29,7 +29,7 @@ import { TimelineVisualization } from "./components/TimelineVisualization";
 import { AppUsageList } from "./components/AppUsageList";
 import { DateSelector } from "./components/DateSelector";
 import { SegmentDetailPanel } from "./components/SegmentDetailPanel";
-import { PrivacyNotice } from "./components/PrivacyNotice";
+// PrivacyNotice removed - not needed for fully local app
 import { RecordingViewer } from "./components/RecordingViewer";
 import { CollectorStatus } from "./components/CollectorStatus";
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -88,8 +88,7 @@ export default function Home() {
   const [selectedSegment, setSelectedSegment] = useState<TimelineSegment | null>(null);
   const [hoveredSegment, setHoveredSegment] = useState<TimelineSegment | null>(null);
 
-  // Privacy notice state
-  const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
+  // Privacy notice removed - not needed for fully local app
 
   // Recording viewer state
   const [showRecordingViewer, setShowRecordingViewer] = useState<boolean>(false);
@@ -301,23 +300,7 @@ export default function Home() {
     }
   };
 
-  // Check if privacy notice should be shown
-  const checkPrivacyNotice = async () => {
-    const dismissed = localStorage.getItem("privacy_notice_dismissed");
-    if (!dismissed) {
-      setShowPrivacyNotice(true);
-    }
-  };
-
-  // Handle privacy notice dismiss
-  const handlePrivacyDismiss = async () => {
-    setShowPrivacyNotice(false);
-  };
-
-  const handlePrivacyDontShowAgain = async () => {
-    localStorage.setItem("privacy_notice_dismissed", "true");
-    setShowPrivacyNotice(false);
-  };
+  // Privacy notice removed - not needed for fully local app
 
   /**
    * Open settings in a new window
@@ -382,7 +365,7 @@ export default function Home() {
   useEffect(() => {
     loadAppCategories();
     loadDashboardSettings();
-    checkPrivacyNotice();
+    // Privacy notice check removed - not needed for fully local app
   }, []);
 
 
@@ -758,13 +741,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* Privacy Notice (full screen modal) */}
-      {showPrivacyNotice && (
-        <PrivacyNotice
-          onDismiss={handlePrivacyDismiss}
-          onDontShowAgain={handlePrivacyDontShowAgain}
-        />
-      )}
+      {/* Privacy Notice removed - not needed for fully local app */}
 
     </main>
   );

@@ -21,7 +21,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { login } from '@/lib/authAPI';
+// Note: Login not available in bundled/local app
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -55,13 +55,8 @@ export default function LoginPage() {
     setError('');
 
     try {
-      await login({
-        email: formData.email.trim(),
-        password: formData.password
-      });
-      
-      // Redirect to profile page after successful login
-      window.location.href = '/profile';
+      // For local bundled app, authentication is not available
+      throw new Error('Authentication is not available in the local bundled app');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
     } finally {

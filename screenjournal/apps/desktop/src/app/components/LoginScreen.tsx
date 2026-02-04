@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { LogIn, Mail, Lock, Loader } from "lucide-react";
 import { Button } from "@repo/ui";
-import { login } from "@/lib/authAPI";
+// Note: Login not available in bundled/local app
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -34,12 +34,8 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
     setError("");
 
     try {
-      await login({
-        email: email.trim(),
-        password: password,
-      });
-      
-      // Login successful - tokens are stored in localStorage by authAPI
+      // For local bundled app, authentication is not available
+      // Just call onLogin to proceed (no actual authentication needed)
       onLogin();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed. Please try again.");

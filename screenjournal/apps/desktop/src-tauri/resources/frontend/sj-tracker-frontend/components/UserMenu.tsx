@@ -21,16 +21,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { logout, getProfile } from '@/lib/authAPI';
-
-interface User {
-  id: number;
-  email: string;
-  name: string | null;
-  created_at: string;
-  updated_at: string;
-  owner?: boolean;
-}
+import { getDefaultUser, logout, type User } from '@/lib/localTypes';
 
 export default function UserMenu() {
   const [user, setUser] = useState<User | null>(null);
@@ -39,23 +30,9 @@ export default function UserMenu() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Try to load user profile (optional - won't fail if backend doesn't support it)
-    getProfile().then(userData => {
-      setUser(userData);
-    }).catch(error => {
-      // If profile fails, use a default user for local version
-      console.log('Profile not available, using default user:', error);
-      setUser({
-        id: 0,
-        email: 'local@screenjournal.local',
-        name: 'Local User',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        owner: true,
-      });
-    }).finally(() => {
-      setIsLoading(false);
-    });
+    // Use default user for local/bundled app (no auth backend)
+    setUser(getDefaultUser());
+    setIsLoading(false);
   }, []);
 
   const handleLogout = () => {
@@ -89,14 +66,7 @@ export default function UserMenu() {
   }
 
   // Use default user if profile not loaded
-  const displayUser = user || {
-    id: 0,
-    email: 'local@screenjournal.local',
-    name: 'Local User',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    owner: true,
-  };
+  const displayUser = user || getDefaultUser();
 
   return (
     <div ref={menuRef} className="relative">
