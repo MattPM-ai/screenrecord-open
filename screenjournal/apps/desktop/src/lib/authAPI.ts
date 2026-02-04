@@ -13,7 +13,7 @@
  * ============================================================================
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api'
+const API_BASE_URL = 'http://localhost:8080/api'
 
 // Storage keys
 const ACCESS_TOKEN_KEY = 'auth_access_token'

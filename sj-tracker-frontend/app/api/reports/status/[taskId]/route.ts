@@ -23,7 +23,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8085'
+const BACKEND_URL = 'http://localhost:8085'
 
 // Force dynamic rendering to prevent Next.js from caching this route
 export const dynamic = 'force-dynamic'

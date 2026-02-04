@@ -34,7 +34,7 @@ interface ReportLoadingProps {
   onError: (error: string) => void
 }
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8085'
+const BACKEND_URL = 'http://localhost:8085'
 
 export default function ReportLoading({ formData, onComplete, onError }: ReportLoadingProps) {
   const [timer, setTimer] = useState('00:00:00')

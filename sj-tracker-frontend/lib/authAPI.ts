@@ -10,7 +10,8 @@
  * ============================================================================
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_BACKEND_URL
+// For local bundled app, auth backend is not needed - API calls will be skipped
+const API_BASE_URL = ''
 
 // Refresh lock to prevent simultaneous refresh operations
 let refreshPromise: Promise<string | null> | null = null
@@ -81,6 +82,11 @@ const refreshToken = async (): Promise<string | null> => {
   // Create new refresh promise
   refreshPromise = (async () => {
     try {
+      // For local bundled app, skip token refresh if auth backend is not configured
+      if (!API_BASE_URL || API_BASE_URL === 'undefined') {
+        return null
+      }
+
       const refreshTokenValue = getCookie('refreshToken')
       if (!refreshTokenValue) {
         return null
@@ -187,6 +193,11 @@ export interface ErrorResponse {
 }
 
 export const login = async (data: LoginRequest): Promise<AuthResponse> => {
+  // For local bundled app, auth backend is not available
+  if (!API_BASE_URL || API_BASE_URL === 'undefined') {
+    throw new Error('Authentication is not available in the local bundled app')
+  }
+
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: 'POST',
     headers: {
@@ -212,6 +223,11 @@ export const login = async (data: LoginRequest): Promise<AuthResponse> => {
  * User registration
  */
 export const register = async (data: RegisterRequest): Promise<AuthResponse> => {
+  // For local bundled app, auth backend is not available
+  if (!API_BASE_URL || API_BASE_URL === 'undefined') {
+    throw new Error('Registration is not available in the local bundled app')
+  }
+
   const response = await fetch(`${API_BASE_URL}/auth/register`, {
     method: 'POST',
     headers: {
@@ -244,6 +260,11 @@ export const register = async (data: RegisterRequest): Promise<AuthResponse> => 
  * Business registration
  */
 export const registerBusiness = async (data: RegisterRequest): Promise<AuthResponse> => {
+  // For local bundled app, auth backend is not available
+  if (!API_BASE_URL || API_BASE_URL === 'undefined') {
+    throw new Error('Business registration is not available in the local bundled app')
+  }
+
   const response = await fetch(`${API_BASE_URL}/auth/register/business`, {
     method: 'POST',
     headers: {
@@ -363,6 +384,10 @@ export interface AccountResponse {
 }
 
 export const getAccountInfo = async (accountId: number): Promise<Account> => {
+  // For local bundled app, auth backend is not available
+  if (!API_BASE_URL || API_BASE_URL === 'undefined') {
+    throw new Error('Account API is not available in the local bundled app')
+  }
   try {
     const response = await authenticatedFetch(`${API_BASE_URL}/accounts/${accountId}`)
     if (!response.ok) {
@@ -401,6 +426,10 @@ export interface CreateJoinCodeResponse {
 }
 
 export const getJoinCodes = async (accountId: number): Promise<JoinCode[]> => {
+  // For local bundled app, auth backend is not available
+  if (!API_BASE_URL || API_BASE_URL === 'undefined') {
+    throw new Error('Join codes API is not available in the local bundled app')
+  }
   try {
     const response = await authenticatedFetch(`${API_BASE_URL}/accounts/${accountId}/join-codes`)
     if (!response.ok) {
@@ -415,6 +444,10 @@ export const getJoinCodes = async (accountId: number): Promise<JoinCode[]> => {
 }
 
 export const createJoinCode = async (accountId: number, expiresInDays: number): Promise<JoinCode> => {
+  // For local bundled app, auth backend is not available
+  if (!API_BASE_URL || API_BASE_URL === 'undefined') {
+    throw new Error('Join codes API is not available in the local bundled app')
+  }
   try {
     const response = await authenticatedFetch(`${API_BASE_URL}/accounts/${accountId}/join-codes`, {
       method: 'POST',
@@ -432,6 +465,10 @@ export const createJoinCode = async (accountId: number, expiresInDays: number): 
 }
 
 export const refreshJoinCode = async (accountId: number): Promise<JoinCode> => {
+  // For local bundled app, auth backend is not available
+  if (!API_BASE_URL || API_BASE_URL === 'undefined') {
+    throw new Error('Join codes API is not available in the local bundled app')
+  }
   try {
     const response = await authenticatedFetch(`${API_BASE_URL}/accounts/${accountId}/join-codes`, {
       method: 'PUT',
@@ -448,6 +485,10 @@ export const refreshJoinCode = async (accountId: number): Promise<JoinCode> => {
 }
 
 export const deleteAllJoinCodes = async (accountId: number): Promise<void> => {
+  // For local bundled app, auth backend is not available
+  if (!API_BASE_URL || API_BASE_URL === 'undefined') {
+    throw new Error('Join codes API is not available in the local bundled app')
+  }
   try {
     const response = await authenticatedFetch(`${API_BASE_URL}/accounts/${accountId}/join-codes`, {
       method: 'DELETE',
@@ -465,6 +506,10 @@ export const deleteAllJoinCodes = async (accountId: number): Promise<void> => {
  * User invitation
  */
 export const inviteUser = async (accountId: number, email: string, referralCode: string): Promise<void> => {
+  // For local bundled app, auth backend is not available
+  if (!API_BASE_URL || API_BASE_URL === 'undefined') {
+    throw new Error('User invitation API is not available in the local bundled app')
+  }
   try {
     const response = await authenticatedFetch(`${API_BASE_URL}/accounts/${accountId}/invite`, {
       method: 'POST',
@@ -512,6 +557,10 @@ export interface ApproveUserResponse {
 }
 
 export const getPendingUsers = async (accountId: number): Promise<PendingUser[]> => {
+  // For local bundled app, return empty list if auth backend is not configured
+  if (!API_BASE_URL || API_BASE_URL === 'undefined') {
+    return []
+  }
   try {
     const response = await authenticatedFetch(`${API_BASE_URL}/accounts/${accountId}/pending-users`)
     if (!response.ok) {
@@ -530,6 +579,10 @@ export const getPendingUsers = async (accountId: number): Promise<PendingUser[]>
 }
 
 export const approvePendingUser = async (accountId: number, pendingUserId: string): Promise<ApproveUserResponse | null> => {
+  // For local bundled app, auth backend is not available
+  if (!API_BASE_URL || API_BASE_URL === 'undefined') {
+    throw new Error('Pending users API is not available in the local bundled app')
+  }
   try {
     const response = await authenticatedFetch(`${API_BASE_URL}/accounts/${accountId}/pending-users/${pendingUserId}/approve`, {
       method: 'POST',
@@ -550,6 +603,10 @@ export const approvePendingUser = async (accountId: number, pendingUserId: strin
 }
 
 export const deletePendingUser = async (accountId: number, pendingUserId: string): Promise<boolean> => {
+  // For local bundled app, auth backend is not available
+  if (!API_BASE_URL || API_BASE_URL === 'undefined') {
+    throw new Error('Pending users API is not available in the local bundled app')
+  }
   try {
     const response = await authenticatedFetch(`${API_BASE_URL}/accounts/${accountId}/pending-users/${pendingUserId}`, {
       method: 'DELETE',

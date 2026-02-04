@@ -70,7 +70,8 @@ export interface UpdateOrganisationRequest {
 // API BASE CONFIGURATION
 // ============================================================================
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_BACKEND_URL
+// For local bundled app, auth backend is not needed - API calls will be skipped
+const API_BASE_URL = ''
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -94,6 +95,20 @@ import { authenticatedFetch } from './authAPI'
 export const organisationsAPI = {
   // Get all organisations with pagination
   getOrganisations: async (page: number = 0, limit: number = 20): Promise<PaginatedResponse<Organisation>> => {
+    // For local bundled app, return empty list if auth backend is not configured
+    if (!API_BASE_URL || API_BASE_URL === 'undefined') {
+      return {
+        success: true,
+        data: [],
+        pagination: {
+          page,
+          limit,
+          count: 0,
+          total: 0,
+          totalPages: 0,
+        },
+      }
+    }
     const response = await authenticatedFetch(`${API_BASE_URL}/organisations?page=${page}&limit=${limit}`, {
       method: 'GET',
     })

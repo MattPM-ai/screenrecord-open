@@ -33,7 +33,7 @@ interface WeeklyReportLoadingProps {
   onError: (error: string) => void
 }
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
+const BACKEND_URL = 'http://localhost:8085'
 
 export default function WeeklyReportLoading({ formData, onComplete, onError }: WeeklyReportLoadingProps) {
   const [timer, setTimer] = useState('00:00:00')

@@ -10,7 +10,8 @@
  * ============================================================================
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_BACKEND_URL
+// For local bundled app, auth backend is not needed - API calls will be skipped
+const API_BASE_URL = ''
 
 // Refresh lock to prevent simultaneous refresh operations
 let refreshPromise: Promise<string | null> | null = null

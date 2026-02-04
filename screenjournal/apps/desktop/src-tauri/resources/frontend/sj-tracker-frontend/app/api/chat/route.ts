@@ -28,8 +28,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 
-// Use NEXT_PUBLIC_ prefix for client-accessible env vars, or server-side only
-const CHAT_AGENT_URL = process.env.NEXT_PUBLIC_CHAT_AGENT_URL || process.env.CHAT_AGENT_URL || 'http://localhost:8087'
+// Hardcoded chat agent URL for bundled app
+const CHAT_AGENT_URL = 'http://localhost:8087'
 
 /**
  * Handles POST requests to send messages to the LangChain chat agent
