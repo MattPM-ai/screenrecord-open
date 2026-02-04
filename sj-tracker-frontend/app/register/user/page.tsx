@@ -85,9 +85,13 @@ function UserRegisterPageContent() {
     }
 
     setLoading(true);
+    setError('');
 
-    // Registration not available in local/bundled app
-    setError('Registration is not available in the local bundled app');
+    try {
+      // For local bundled app, registration is not available
+      throw new Error('Registration is not available in the local bundled app');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
       setLoading(false);
     }

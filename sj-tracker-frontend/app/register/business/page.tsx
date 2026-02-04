@@ -45,9 +45,13 @@ export default function BusinessRegisterPage() {
     }
 
     setLoading(true);
+    setError('');
 
-    // Registration not available in local/bundled app
-    setError('Registration is not available in the local bundled app');
+    try {
+      // For local bundled app, business registration is not available
+      throw new Error('Business registration is not available in the local bundled app');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
       setLoading(false);
     }
