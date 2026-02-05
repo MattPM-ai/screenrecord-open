@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-// Note: Business registration not available in bundled/local app
+// Registration not available in local/bundled app (no auth backend)
 
 export default function BusinessRegisterPage() {
   const [formData, setFormData] = useState({
@@ -45,17 +45,11 @@ export default function BusinessRegisterPage() {
     }
 
     setLoading(true);
+    setError('');
 
     try {
       // For local bundled app, business registration is not available
       throw new Error('Business registration is not available in the local bundled app');
-        name: formData.name,
-        email: formData.email,
-        password: formData.password
-      });
-      
-      // Redirect to profile page after successful business registration
-      router.push('/profile');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {

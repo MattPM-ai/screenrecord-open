@@ -16,7 +16,7 @@
 'use client'
 
 import { useState, FormEvent, useEffect } from 'react'
-import { getDefaultUser, getDefaultOrganisations, type Organisation, type OrganisationUser } from '@/lib/localTypes'
+import { getDefaultUser, getDefaultOrganisation, type Organisation, type OrganisationUser } from '@/lib/localTypes'
 
 const GEMINI_API_KEY_STORAGE_KEY = 'gemini_api_key'
 
@@ -58,9 +58,8 @@ export default function ReportForm({ onSubmit }: ReportFormProps) {
         setLoading(true)
         setError('')
 
-        // Get user profile to retrieve accountId and check ownership
+        // Use default user for local/bundled app (no auth backend)
         const userProfile = getDefaultUser()
-        // Use default account ID (0) for local version if not available
         const accountIdValue = userProfile.account_id ?? 0
         setAccountId(accountIdValue)
         setIsOwner(userProfile.owner === true)
@@ -68,44 +67,45 @@ export default function ReportForm({ onSubmit }: ReportFormProps) {
         setCurrentUserName(userProfile.name || '')
         setCurrentUserEmail(userProfile.email)
 
-        // For local version, use default organization instead of fetching from API
-        // This avoids 404 errors when the organisations API is not available
-        setOrganisations(getDefaultOrganisations(accountIdValue))
+        // Use default organization for local/bundled app
+        const defaultOrg = getDefaultOrganisation(accountIdValue)
+        setOrganisations([defaultOrg])
         setSelectedOrgId('0')
         
         // Pre-select default user
         setSelectedUserIds([0])
       } catch (err) {
         console.error('Failed to load form data:', err)
-        // Even if profile fails, set defaults for local version
+        // Set defaults for local version
         setAccountId(0)
-        const defaultOrg: Organisation = {
-          id: 0,
-          name: 'Local Organization',
-          description: 'Default organization for local use',
-          account_id: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }
+        const defaultOrg = getDefaultOrganisation(0)
         setOrganisations([defaultOrg])
         setSelectedOrgId('0')
         setSelectedUserIds([0])
         setError('') // Don't show error for local version
       } finally {
+        // Always set loading to false, even if there's an error
         setLoading(false)
       }
     }
 
-    loadData()
+    // Load API key from localStorage (with error handling)
+    let storedApiKey: string | null = null
+    try {
+      storedApiKey = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY)
+    } catch (err) {
+      console.warn('localStorage not available:', err)
+    }
 
-    // Load API key from localStorage
-    const storedApiKey = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY)
     if (storedApiKey) {
       setApiKey(storedApiKey)
     } else {
       // Show API key input if not set
       setShowApiKeyInput(true)
     }
+
+    // Load data after setting up API key
+    loadData()
   }, [])
 
   // For local version, use default user instead of loading from API

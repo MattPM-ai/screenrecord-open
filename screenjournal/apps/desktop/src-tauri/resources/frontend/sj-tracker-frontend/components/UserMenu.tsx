@@ -66,7 +66,14 @@ export default function UserMenu() {
   }
 
   // Use default user if profile not loaded
-  const displayUser = user || getDefaultUser();
+  const displayUser = user || {
+    id: 0,
+    email: 'local@screenjournal.local',
+    name: 'Local User',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    owner: true,
+  };
 
   return (
     <div ref={menuRef} className="relative">

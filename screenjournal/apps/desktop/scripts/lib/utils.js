@@ -140,6 +140,7 @@ function copyFile(src, dest) {
 
 /**
  * Copy a directory recursively (cross-platform)
+ * Handles directories, files, and symlinks
  * @param {string} src - Source directory path
  * @param {string} dest - Destination directory path
  */
@@ -151,7 +152,30 @@ function copyDirRecursive(src, dest) {
     const srcPath = path.join(src, entry.name);
     const destPath = path.join(dest, entry.name);
     
-    if (entry.isDirectory()) {
+    // Use lstat to detect symlinks (stat follows symlinks)
+    const stat = fs.lstatSync(srcPath);
+    
+    if (stat.isSymbolicLink()) {
+      // Preserve symlinks by reading the target and recreating the symlink
+      const linkTarget = fs.readlinkSync(srcPath);
+      
+      // Remove existing symlink if it exists
+      if (fs.existsSync(destPath)) {
+        try {
+          fs.unlinkSync(destPath);
+        } catch (e) {
+          // Ignore if it's not a symlink or doesn't exist
+        }
+      }
+      
+      // Recreate symlink with the same target (preserve relative/absolute as-is)
+      try {
+        fs.symlinkSync(linkTarget, destPath);
+      } catch (error) {
+        // If symlink creation fails, log warning but continue
+        console.warn(`  ⚠️  Failed to copy symlink ${entry.name}: ${error.message}`);
+      }
+    } else if (entry.isDirectory()) {
       copyDirRecursive(srcPath, destPath);
     } else {
       fs.copyFileSync(srcPath, destPath);

@@ -62,33 +62,6 @@ export const getDefaultOrganisation = (accountId: number = 0): Organisation => (
 })
 
 /**
- * Get default organizations for local/bundled app
- */
-export const getDefaultOrganisations = (accountId: number = 0): Organisation[] => ([
-  {
-    id: 0,
-    name: 'Local Organization',
-    description: 'Default organization for local use',
-    account_id: accountId,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }
-])
-
-/**
- * Get default organization users for local/bundled app
- */
-export const getDefaultOrganisationUsers = (): OrganisationUser[] => ([
-  {
-    id: 0,
-    email: 'local@screenjournal.local',
-    name: 'Local User',
-    owner: true,
-    created_at: new Date().toISOString(),
-  }
-])
-
-/**
  * Simple logout function (no-op for local app)
  */
 export const logout = () => {

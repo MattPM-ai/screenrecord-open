@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-// Note: Registration not available in bundled/local app
+// Registration not available in local/bundled app (no auth backend)
 
 function UserRegisterPageContent() {
   const router = useRouter();
@@ -85,6 +85,7 @@ function UserRegisterPageContent() {
     }
 
     setLoading(true);
+    setError('');
 
     try {
       // For local bundled app, registration is not available
