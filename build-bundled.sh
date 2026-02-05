@@ -315,13 +315,58 @@ fi
 echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC}"
     cd "$SCRIPT_DIR"
     mkdir -p "$TAURI_RESOURCES_DIR/frontend"
-    # Use rsync or cp with -L to follow symlinks and ensure complete copy
+    
+    # For Next.js standalone builds, we need to copy:
+    # 1. The standalone directory (.next/standalone)
+    # 2. The static directory (.next/static) - required for static assets
+    # 3. The public directory (if it exists)
+    # 4. node_modules (for dependencies)
+    # 
+    # IMPORTANT: Next.js standalone mode creates symlinks from .next/standalone to .next/static
+    # We must preserve these symlinks, NOT resolve them, or the static assets won't be found
+    
+    FRONTEND_SRC="$SCRIPT_DIR/sj-tracker-frontend"
+    FRONTEND_DEST="$TAURI_RESOURCES_DIR/frontend/sj-tracker-frontend"
+    
+    # Use rsync WITHOUT --copy-links to preserve symlinks (critical for Next.js standalone)
+    # The -a flag preserves permissions and timestamps, but we need symlinks intact
     if command -v rsync >/dev/null 2>&1; then
-        rsync -a --copy-links "$SCRIPT_DIR/sj-tracker-frontend/" "$TAURI_RESOURCES_DIR/frontend/sj-tracker-frontend/"
+        # -a preserves permissions, -v for verbose, but DON'T use --copy-links
+        # This preserves the symlinks that Next.js creates from standalone to static
+        rsync -av "$FRONTEND_SRC/" "$FRONTEND_DEST/" --exclude='.git' --exclude='node_modules/.cache'
     else
-        # Use cp with -L to follow symlinks
-        cp -RL "$SCRIPT_DIR/sj-tracker-frontend" "$TAURI_RESOURCES_DIR/frontend/"
+        # Use cp with -a to preserve symlinks (NOT -L which resolves them)
+        cp -a "$FRONTEND_SRC" "$TAURI_RESOURCES_DIR/frontend/"
     fi
+    
+    # Verify critical directories exist
+    if [ -d "$FRONTEND_DEST/.next/standalone" ]; then
+        echo -e "${GREEN}✅ Standalone build found${NC}"
+        # Check if static symlink exists in standalone directory
+        if [ -L "$FRONTEND_DEST/.next/standalone/.next/static" ] || [ -d "$FRONTEND_DEST/.next/standalone/.next/static" ]; then
+            echo -e "${GREEN}✅ Static assets symlink found in standalone directory${NC}"
+        else
+            echo -e "${YELLOW}⚠️  Static assets symlink missing in standalone - checking if static directory exists${NC}"
+            # If symlink is broken, we need to ensure static directory is accessible
+            if [ -d "$FRONTEND_DEST/.next/static" ]; then
+                echo -e "${YELLOW}⚠️  Static directory exists but symlink is missing - recreating symlink${NC}"
+                # Create the .next directory in standalone if it doesn't exist
+                mkdir -p "$FRONTEND_DEST/.next/standalone/.next"
+                # Create symlink from standalone/.next/static to parent .next/static
+                ln -sf "../../static" "$FRONTEND_DEST/.next/standalone/.next/static"
+                echo -e "${GREEN}✅ Recreated static assets symlink${NC}"
+            fi
+        fi
+    else
+        echo -e "${YELLOW}⚠️  Standalone build not found - frontend may not work${NC}"
+    fi
+    
+    if [ -d "$FRONTEND_DEST/.next/static" ]; then
+        echo -e "${GREEN}✅ Static assets directory found${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Static assets directory not found - frontend will have 404 errors${NC}"
+    fi
+    
     echo -e "${GREEN}✅ Frontend copied to Tauri app${NC}"
     
 # Build Tauri app (this will bundle resources, sign, and notarize once)
