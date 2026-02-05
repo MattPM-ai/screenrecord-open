@@ -330,19 +330,23 @@ echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC
     FRONTEND_DEST="$TAURI_RESOURCES_DIR/frontend/sj-tracker-frontend"
     
     # First, copy everything except .next (we'll handle that separately)
-    # IMPORTANT: Use --no-xattrs to avoid extended attributes that can break code signing
+    # IMPORTANT: Strip extended attributes after copying to avoid breaking code signing
     echo -e "${YELLOW}   Copying frontend files...${NC}"
     if command -v rsync >/dev/null 2>&1; then
         # Copy everything except .next and .git
-        # --no-xattrs: Don't preserve extended attributes (can break code signing)
-        # -a: Archive mode (preserves permissions, timestamps, but not xattrs)
-        rsync -a --no-xattrs "$FRONTEND_SRC/" "$FRONTEND_DEST/" \
+        # -a: Archive mode (preserves permissions, timestamps)
+        # Note: macOS rsync doesn't support --no-xattrs, so we'll strip xattrs after copying
+        rsync -a "$FRONTEND_SRC/" "$FRONTEND_DEST/" \
             --exclude='.git' \
             --exclude='.next' \
             --exclude='node_modules/.cache'
+        # Strip extended attributes after copying (required for code signing)
+        if command -v xattr >/dev/null 2>&1; then
+            xattr -rc "$FRONTEND_DEST" 2>/dev/null || true
+        fi
     else
         # Use cp - exclude .next and .git manually
-        # -R: Recursive, -p: Preserve permissions/timestamps (but not xattrs)
+        # -R: Recursive, -p: Preserve permissions/timestamps
         mkdir -p "$FRONTEND_DEST"
         cp -Rp "$FRONTEND_SRC"/* "$FRONTEND_DEST/" 2>/dev/null || true
         cp -Rp "$FRONTEND_SRC"/.[!.]* "$FRONTEND_DEST/" 2>/dev/null || true
@@ -362,8 +366,13 @@ echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC
             echo -e "${YELLOW}   Copying standalone build...${NC}"
             mkdir -p "$FRONTEND_DEST/.next/standalone"
             if command -v rsync >/dev/null 2>&1; then
-                # --no-xattrs: Don't preserve extended attributes (can break code signing)
-                rsync -a --no-xattrs "$FRONTEND_SRC/.next/standalone/" "$FRONTEND_DEST/.next/standalone/" --exclude='.next'
+                # -a: Archive mode (preserves permissions, timestamps)
+                # Note: macOS rsync doesn't support --no-xattrs, so we'll strip xattrs after copying
+                rsync -a "$FRONTEND_SRC/.next/standalone/" "$FRONTEND_DEST/.next/standalone/" --exclude='.next'
+                # Strip extended attributes after copying (required for code signing)
+                if command -v xattr >/dev/null 2>&1; then
+                    xattr -rc "$FRONTEND_DEST/.next/standalone" 2>/dev/null || true
+                fi
             else
                 cp -Rp "$FRONTEND_SRC/.next/standalone"/* "$FRONTEND_DEST/.next/standalone/" 2>/dev/null || true
                 # Strip extended attributes
@@ -388,9 +397,14 @@ echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC
                 rm -rf "$FRONTEND_DEST/.next/standalone/.next/static" 2>/dev/null || true
                 
                 # Copy static files directly (not as symlink)
-                # --no-xattrs: Don't preserve extended attributes (can break code signing)
                 if command -v rsync >/dev/null 2>&1; then
-                    rsync -a --no-xattrs "$FRONTEND_SRC/.next/static/" "$FRONTEND_DEST/.next/standalone/.next/static/"
+                    # -a: Archive mode (preserves permissions, timestamps)
+                    # Note: macOS rsync doesn't support --no-xattrs, so we'll strip xattrs after copying
+                    rsync -a "$FRONTEND_SRC/.next/static/" "$FRONTEND_DEST/.next/standalone/.next/static/"
+                    # Strip extended attributes after copying (required for code signing)
+                    if command -v xattr >/dev/null 2>&1; then
+                        xattr -rc "$FRONTEND_DEST/.next/standalone/.next/static" 2>/dev/null || true
+                    fi
                 else
                     cp -Rp "$FRONTEND_SRC/.next/static" "$FRONTEND_DEST/.next/standalone/.next/"
                     # Strip extended attributes
@@ -406,7 +420,13 @@ echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC
                 echo -e "${YELLOW}   Copying .next/static directory...${NC}"
                 mkdir -p "$FRONTEND_DEST/.next"
                 if command -v rsync >/dev/null 2>&1; then
-                    rsync -a --no-xattrs "$FRONTEND_SRC/.next/static/" "$FRONTEND_DEST/.next/static/"
+                    # -a: Archive mode (preserves permissions, timestamps)
+                    # Note: macOS rsync doesn't support --no-xattrs, so we'll strip xattrs after copying
+                    rsync -a "$FRONTEND_SRC/.next/static/" "$FRONTEND_DEST/.next/static/"
+                    # Strip extended attributes after copying (required for code signing)
+                    if command -v xattr >/dev/null 2>&1; then
+                        xattr -rc "$FRONTEND_DEST/.next/static" 2>/dev/null || true
+                    fi
                 else
                     cp -Rp "$FRONTEND_SRC/.next/static" "$FRONTEND_DEST/.next/"
                     # Strip extended attributes
@@ -419,7 +439,13 @@ echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC
             # If no standalone build, copy entire .next directory
             echo -e "${YELLOW}   Copying .next directory (no standalone build found)...${NC}"
             if command -v rsync >/dev/null 2>&1; then
-                rsync -a --no-xattrs "$FRONTEND_SRC/.next/" "$FRONTEND_DEST/.next/"
+                # -a: Archive mode (preserves permissions, timestamps)
+                # Note: macOS rsync doesn't support --no-xattrs, so we'll strip xattrs after copying
+                rsync -a "$FRONTEND_SRC/.next/" "$FRONTEND_DEST/.next/"
+                # Strip extended attributes after copying (required for code signing)
+                if command -v xattr >/dev/null 2>&1; then
+                    xattr -rc "$FRONTEND_DEST/.next" 2>/dev/null || true
+                fi
             else
                 cp -Rp "$FRONTEND_SRC/.next" "$FRONTEND_DEST/"
                 # Strip extended attributes
@@ -440,19 +466,25 @@ echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC
         elif [ -L "$FRONTEND_DEST/.next/standalone/.next/static" ]; then
             # If it's still a symlink, replace it with actual files
             echo -e "${YELLOW}⚠️  Static assets are still a symlink - replacing with direct copy...${NC}"
-            if [ -d "$FRONTEND_DEST/.next/static" ]; then
-                rm -f "$FRONTEND_DEST/.next/standalone/.next/static"
-                mkdir -p "$FRONTEND_DEST/.next/standalone/.next"
-                if command -v rsync >/dev/null 2>&1; then
-                    rsync -a --no-xattrs "$FRONTEND_DEST/.next/static/" "$FRONTEND_DEST/.next/standalone/.next/static/"
-                else
-                    cp -Rp "$FRONTEND_DEST/.next/static" "$FRONTEND_DEST/.next/standalone/.next/"
-                    # Strip extended attributes
-                    if command -v xattr >/dev/null 2>&1; then
-                        xattr -rc "$FRONTEND_DEST/.next/standalone/.next/static" 2>/dev/null || true
+                if [ -d "$FRONTEND_DEST/.next/static" ]; then
+                    rm -f "$FRONTEND_DEST/.next/standalone/.next/static"
+                    mkdir -p "$FRONTEND_DEST/.next/standalone/.next"
+                    if command -v rsync >/dev/null 2>&1; then
+                        # -a: Archive mode (preserves permissions, timestamps)
+                        # Note: macOS rsync doesn't support --no-xattrs, so we'll strip xattrs after copying
+                        rsync -a "$FRONTEND_DEST/.next/static/" "$FRONTEND_DEST/.next/standalone/.next/static/"
+                        # Strip extended attributes after copying (required for code signing)
+                        if command -v xattr >/dev/null 2>&1; then
+                            xattr -rc "$FRONTEND_DEST/.next/standalone/.next/static" 2>/dev/null || true
+                        fi
+                    else
+                        cp -Rp "$FRONTEND_DEST/.next/static" "$FRONTEND_DEST/.next/standalone/.next/"
+                        # Strip extended attributes
+                        if command -v xattr >/dev/null 2>&1; then
+                            xattr -rc "$FRONTEND_DEST/.next/standalone/.next/static" 2>/dev/null || true
+                        fi
                     fi
-                fi
-                echo -e "${GREEN}✅ Replaced symlink with direct file copy${NC}"
+                    echo -e "${GREEN}✅ Replaced symlink with direct file copy${NC}"
             else
                 echo -e "${RED}❌ Static assets symlink is broken and source directory not found!${NC}"
             fi
@@ -462,7 +494,13 @@ echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC
             if [ -d "$FRONTEND_DEST/.next/static" ]; then
                 mkdir -p "$FRONTEND_DEST/.next/standalone/.next"
                 if command -v rsync >/dev/null 2>&1; then
-                    rsync -a --no-xattrs "$FRONTEND_DEST/.next/static/" "$FRONTEND_DEST/.next/standalone/.next/static/"
+                    # -a: Archive mode (preserves permissions, timestamps)
+                    # Note: macOS rsync doesn't support --no-xattrs, so we'll strip xattrs after copying
+                    rsync -a "$FRONTEND_DEST/.next/static/" "$FRONTEND_DEST/.next/standalone/.next/static/"
+                    # Strip extended attributes after copying (required for code signing)
+                    if command -v xattr >/dev/null 2>&1; then
+                        xattr -rc "$FRONTEND_DEST/.next/standalone/.next/static" 2>/dev/null || true
+                    fi
                 else
                     cp -Rp "$FRONTEND_DEST/.next/static" "$FRONTEND_DEST/.next/standalone/.next/"
                     # Strip extended attributes
