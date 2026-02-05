@@ -1,6 +1,6 @@
 # Release Desktop App Workflow
 #
-# Builds and publishes the ScreenJournal Open desktop app for macOS.
+# Builds and publishes the ScreenJournal Open desktop app for all platforms.
 # This version bundles all services (databases, backends, frontend) into a standalone app.
 # Triggers on version tags (v*.*.*) or manual dispatch.
 #
@@ -18,6 +18,10 @@
 #   Method 2 - Apple ID credentials:
 #     APPLE_ID - Apple ID email
 #     APPLE_PASSWORD - App-specific password (from appleid.apple.com)
+#
+# Required secrets for Windows signing (add when ready):
+#   WINDOWS_CERTIFICATE - Base64-encoded certificate
+#   WINDOWS_CERTIFICATE_PASSWORD - Certificate password
 
 name: Release Desktop App
 
@@ -68,20 +72,39 @@ jobs:
               repo: context.repo.repo,
               tag_name: `v${{ steps.version.outputs.version }}`,
               name: `ScreenJournal Open v${{ steps.version.outputs.version }}`,
-              body: `## ScreenJournal Open v${{ steps.version.outputs.version }}\n\nDownload the macOS installer below.\n\n### Installation\n- **macOS**: Download the .dmg file and drag to Applications`,
+              body: `## ScreenJournal Open v${{ steps.version.outputs.version }}\n\nDownload the installer for your platform below.\n\n### Installation\n- **macOS**: Download the .dmg file and drag to Applications\n- **Windows**: Download and run the .exe installer or extract the .zip file\n\n**Note**: Linux builds are currently unavailable due to dependency compatibility issues.`,
               draft: true,
               prerelease: false
             })
             return data.id
 
   # =============================================================================
-  # Build for macOS
+  # Build for All Platforms
   # =============================================================================
   build:
     needs: create-release
     permissions:
       contents: write
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS (build script handles both arm64 and x64)
+          - platform: macos-latest
+            build_script: './build-bundled.sh'
+            artifact_name: macOS-universal
+            artifact_pattern: 'screenjournal/apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg'
+          # Linux - Currently skipped due to libspa/PipeWire compatibility issues
+          # - platform: ubuntu-22.04
+          #   build_script: './build-bundled-linux.sh'
+          #   artifact_name: Linux-x64
+          #   artifact_pattern: 'screenjournal/apps/desktop/src-tauri/target/release/bundle/deb/*.deb'
+          # Windows
+          - platform: windows-latest
+            build_script: './build-bundled-windows.sh'
+            artifact_name: Windows-x64
+
+    runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -115,9 +138,31 @@ jobs:
       # =========================================================================
       # Platform-specific dependencies
       # =========================================================================
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            libpipewire-0.3-dev \
+            ffmpeg \
+            dpkg-dev
+
       - name: Install macOS dependencies
+        if: matrix.platform == 'macos-latest'
         run: |
           brew install ffmpeg || true
+
+      - name: Install Windows dependencies
+        if: matrix.platform == 'windows-latest'
+        run: |
+          # Windows dependencies are typically pre-installed in GitHub Actions
+          # Visual Studio Build Tools should be available
+          echo "Windows dependencies should be pre-installed"
 
       # =========================================================================
       # Install npm dependencies
@@ -153,10 +198,10 @@ jobs:
         working-directory: screenjournal/apps/desktop
 
       # =========================================================================
-      # Import Apple Code Signing Certificate
+      # Import Apple Code Signing Certificate (macOS only)
       # =========================================================================
       - name: Import Apple Certificate
-        if: env.APPLE_CERTIFICATE != ''
+        if: matrix.platform == 'macos-latest' && env.APPLE_CERTIFICATE != ''
         run: |
           echo "🔐 Importing Apple Developer ID certificate..."
           # Create temporary keychain for certificate
@@ -184,9 +229,10 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
       # =========================================================================
-      # Setup App Store Connect API Key (.p8 file) for Notarization
+      # Setup App Store Connect API Key (.p8 file) for Notarization (macOS only)
       # =========================================================================
       - name: Setup App Store Connect API Key
+        if: matrix.platform == 'macos-latest'
         run: |
           echo "🔑 Setting up App Store Connect API key for notarization..."
           
@@ -240,6 +286,7 @@ jobs:
       # symlinks are properly handled. This must happen before build-bundled.sh runs
       # to avoid interfering with PyInstaller, but AFTER setup-aw/setup-ffmpeg.
       - name: Sign ActivityWatch and FFmpeg Binaries
+        if: matrix.platform == 'macos-latest'
         env:
           IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           ENTITLEMENTS: "screenjournal/apps/desktop/src-tauri/entitlements.plist"
@@ -288,11 +335,13 @@ jobs:
       # Make build script executable and run it
       # =========================================================================
       - name: Make build script executable
-        run: chmod +x ./build-bundled.sh
+        if: matrix.platform != 'windows-latest'
+        run: chmod +x ${{ matrix.build_script }}
 
-      - name: Run bundled build script
+      - name: Run bundled build script (Unix)
+        if: matrix.platform != 'windows-latest'
         shell: bash
-        run: ./build-bundled.sh
+        run: ${{ matrix.build_script }}
         env:
           # Gemini API key - embedded at build time if needed
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -313,16 +362,28 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_PATH: ${{ env.APPLE_API_KEY_PATH }}
 
+      - name: Run bundled build script (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: bash ${{ matrix.build_script }}
+        env:
+          # Gemini API key - embedded at build time if needed
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Windows signing - uncomment when certificate is configured
+          # WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          # WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+
       # =========================================================================
       # Upload artifacts to release
       # =========================================================================
       - name: Find and upload macOS DMG
+        if: matrix.platform == 'macos-latest'
         uses: actions/github-script@v7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
           VERSION: ${{ needs.create-release.outputs.version }}
-          ARTIFACT_NAME: macOS-universal
+          ARTIFACT_NAME: ${{ matrix.artifact_name }}
         with:
           script: |
             const fs = require('fs');
@@ -351,6 +412,128 @@ jobs:
               headers: {
                 'content-type': 'application/x-apple-diskimage',
                 'content-length': fs.statSync(dmgPath).size
+              }
+            });
+            
+            console.log(`Uploaded: ${data.browser_download_url}`);
+
+      # Linux DEB upload - Currently skipped due to libspa/PipeWire compatibility issues
+      # - name: Find and upload Linux DEB
+      #   if: matrix.platform == 'ubuntu-22.04'
+      #   uses: actions/github-script@v7
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+      #     VERSION: ${{ needs.create-release.outputs.version }}
+      #     ARTIFACT_NAME: ${{ matrix.artifact_name }}
+      #   with:
+      #     script: |
+      #       const fs = require('fs');
+      #       const { execSync } = require('child_process');
+      #       
+      #       // Find DEB file
+      #       const debFiles = execSync(`find screenjournal/apps/desktop/src-tauri/target -name "*.deb" -type f`, { encoding: 'utf-8' }).trim().split('\n').filter(f => f);
+      #       
+      #       if (debFiles.length === 0) {
+      #         throw new Error('No DEB file found');
+      #       }
+      #       
+      #       const debPath = debFiles[0];
+      #       const debName = `ScreenJournal-Open-${process.env.ARTIFACT_NAME}-${process.env.VERSION}.deb`;
+      #       
+      #       console.log(`Uploading ${debPath} as ${debName}`);
+      #       
+      #       const { data } = await github.rest.repos.uploadReleaseAsset({
+      #         owner: context.repo.owner,
+      #         repo: context.repo.repo,
+      #         release_id: parseInt(process.env.RELEASE_ID),
+      #         name: debName,
+      #         data: fs.readFileSync(debPath),
+      #         headers: {
+      #           'content-type': 'application/vnd.debian.binary-package',
+      #           'content-length': fs.statSync(debPath).size
+      #         }
+      #       });
+      #       
+      #       console.log(`Uploaded: ${data.browser_download_url}`);
+
+      - name: Find and upload Windows installer
+        if: matrix.platform == 'windows-latest'
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+          VERSION: ${{ needs.create-release.outputs.version }}
+          ARTIFACT_NAME: ${{ matrix.artifact_name }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Recursive function to find files matching pattern
+            function findFiles(dir, pattern, fileList = []) {
+              if (!fs.existsSync(dir)) {
+                return fileList;
+              }
+              
+              const files = fs.readdirSync(dir);
+              
+              for (const file of files) {
+                const filePath = path.join(dir, file);
+                const stat = fs.statSync(filePath);
+                
+                if (stat.isDirectory()) {
+                  findFiles(filePath, pattern, fileList);
+                } else if (stat.isFile() && pattern.test(file)) {
+                  fileList.push(filePath);
+                }
+              }
+              
+              return fileList;
+            }
+            
+            // Try to find .exe installer first (in nsis directory)
+            let installerPath = null;
+            let installerName = null;
+            let contentType = 'application/x-msdownload';
+            
+            const targetDir = path.join('screenjournal', 'apps', 'desktop', 'src-tauri', 'target');
+            
+            // Look for .exe files in nsis subdirectories
+            const exeFiles = findFiles(targetDir, /\.exe$/i).filter(p => 
+              p.toLowerCase().includes('nsis') || p.toLowerCase().includes('installer')
+            );
+            
+            if (exeFiles.length > 0) {
+              installerPath = exeFiles[0];
+              installerName = `ScreenJournal-Open-${process.env.ARTIFACT_NAME}-${process.env.VERSION}.exe`;
+            } else {
+              console.log('No .exe installer found, trying zip...');
+              
+              // Fallback to zip files
+              const zipFiles = findFiles(targetDir, /\.zip$/i);
+              
+              if (zipFiles.length > 0) {
+                installerPath = zipFiles[0];
+                installerName = `ScreenJournal-Open-${process.env.ARTIFACT_NAME}-${process.env.VERSION}.zip`;
+                contentType = 'application/zip';
+              } else {
+                throw new Error('No installer or zip file found');
+              }
+            }
+            
+            console.log(`Found installer: ${installerPath}`);
+            console.log(`Uploading as ${installerName}`);
+            
+            const { data } = await github.rest.repos.uploadReleaseAsset({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: parseInt(process.env.RELEASE_ID),
+              name: installerName,
+              data: fs.readFileSync(installerPath),
+              headers: {
+                'content-type': contentType,
+                'content-length': fs.statSync(installerPath).size
               }
             });
             
