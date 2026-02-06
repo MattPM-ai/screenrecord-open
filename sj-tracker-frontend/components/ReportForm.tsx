@@ -84,28 +84,20 @@ export default function ReportForm({ onSubmit }: ReportFormProps) {
         setSelectedUserIds([0])
         setError('') // Don't show error for local version
       } finally {
-        // Always set loading to false, even if there's an error
         setLoading(false)
       }
     }
 
-    // Load API key from localStorage (with error handling)
-    let storedApiKey: string | null = null
-    try {
-      storedApiKey = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY)
-    } catch (err) {
-      console.warn('localStorage not available:', err)
-    }
+    loadData()
 
+    // Load API key from localStorage
+    const storedApiKey = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY)
     if (storedApiKey) {
       setApiKey(storedApiKey)
     } else {
       // Show API key input if not set
       setShowApiKeyInput(true)
     }
-
-    // Load data after setting up API key
-    loadData()
   }, [])
 
   // For local version, use default user instead of loading from API
