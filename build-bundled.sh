@@ -322,109 +322,40 @@ echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC
     # 3. The public directory (if it exists)
     # 4. node_modules (for dependencies)
     # 
-    # IMPORTANT: Next.js standalone mode creates symlinks from .next/standalone/.next/static to ../../static
-    # These symlinks break when bundled into Tauri because relative paths don't resolve correctly.
-    # SOLUTION: Copy static files directly into standalone directory instead of using symlinks.
+    # IMPORTANT: Next.js standalone mode creates symlinks from .next/standalone to .next/static
+    # We must preserve these symlinks, NOT resolve them, or the static assets won't be found
     
     FRONTEND_SRC="$SCRIPT_DIR/sj-tracker-frontend"
     FRONTEND_DEST="$TAURI_RESOURCES_DIR/frontend/sj-tracker-frontend"
     
-    # First, copy everything except .next (we'll handle that separately)
-    echo -e "${YELLOW}   Copying frontend files...${NC}"
+    # Use rsync WITHOUT --copy-links to preserve symlinks (critical for Next.js standalone)
+    # The -a flag preserves permissions and timestamps, but we need symlinks intact
     if command -v rsync >/dev/null 2>&1; then
-        # Copy everything except .next and .git
-        rsync -av "$FRONTEND_SRC/" "$FRONTEND_DEST/" \
-            --exclude='.git' \
-            --exclude='.next' \
-            --exclude='node_modules/.cache'
+        # -a preserves permissions, -v for verbose, but DON'T use --copy-links
+        # This preserves the symlinks that Next.js creates from standalone to static
+        rsync -av "$FRONTEND_SRC/" "$FRONTEND_DEST/" --exclude='.git' --exclude='node_modules/.cache'
     else
-        # Use cp - exclude .next and .git manually
-        mkdir -p "$FRONTEND_DEST"
-        cp -a "$FRONTEND_SRC"/* "$FRONTEND_DEST/" 2>/dev/null || true
-        cp -a "$FRONTEND_SRC"/.[!.]* "$FRONTEND_DEST/" 2>/dev/null || true
-        rm -rf "$FRONTEND_DEST/.git" "$FRONTEND_DEST/.next" 2>/dev/null || true
-    fi
-    
-    # Now handle .next directory structure properly
-    if [ -d "$FRONTEND_SRC/.next" ]; then
-        echo -e "${YELLOW}   Copying .next directory structure...${NC}"
-        
-        # Copy standalone directory
-        if [ -d "$FRONTEND_SRC/.next/standalone" ]; then
-            echo -e "${YELLOW}   Copying standalone build...${NC}"
-            mkdir -p "$FRONTEND_DEST/.next/standalone"
-            if command -v rsync >/dev/null 2>&1; then
-                rsync -av "$FRONTEND_SRC/.next/standalone/" "$FRONTEND_DEST/.next/standalone/" --exclude='.next'
-            else
-                cp -a "$FRONTEND_SRC/.next/standalone"/* "$FRONTEND_DEST/.next/standalone/" 2>/dev/null || true
-            fi
-            
-            # CRITICAL FIX: Copy static files directly into standalone/.next/static instead of using symlinks
-            # This ensures static files are always accessible regardless of working directory
-            if [ -d "$FRONTEND_SRC/.next/static" ]; then
-                echo -e "${YELLOW}   Copying static files into standalone directory (replacing symlink)...${NC}"
-                mkdir -p "$FRONTEND_DEST/.next/standalone/.next"
-                
-                # Remove any existing symlink or directory
-                rm -rf "$FRONTEND_DEST/.next/standalone/.next/static" 2>/dev/null || true
-                
-                # Copy static files directly (not as symlink)
-                if command -v rsync >/dev/null 2>&1; then
-                    rsync -av "$FRONTEND_SRC/.next/static/" "$FRONTEND_DEST/.next/standalone/.next/static/"
-                else
-                    cp -a "$FRONTEND_SRC/.next/static" "$FRONTEND_DEST/.next/standalone/.next/"
-                fi
-                echo -e "${GREEN}   ✅ Static files copied directly into standalone directory${NC}"
-            fi
-            
-            # Also copy the parent .next/static directory for fallback
-            if [ -d "$FRONTEND_SRC/.next/static" ]; then
-                echo -e "${YELLOW}   Copying .next/static directory...${NC}"
-                mkdir -p "$FRONTEND_DEST/.next"
-                if command -v rsync >/dev/null 2>&1; then
-                    rsync -av "$FRONTEND_SRC/.next/static/" "$FRONTEND_DEST/.next/static/"
-                else
-                    cp -a "$FRONTEND_SRC/.next/static" "$FRONTEND_DEST/.next/"
-                fi
-            fi
-        else
-            # If no standalone build, copy entire .next directory
-            echo -e "${YELLOW}   Copying .next directory (no standalone build found)...${NC}"
-            if command -v rsync >/dev/null 2>&1; then
-                rsync -av "$FRONTEND_SRC/.next/" "$FRONTEND_DEST/.next/"
-            else
-                cp -a "$FRONTEND_SRC/.next" "$FRONTEND_DEST/"
-            fi
-        fi
+        # Use cp with -a to preserve symlinks (NOT -L which resolves them)
+        cp -a "$FRONTEND_SRC" "$TAURI_RESOURCES_DIR/frontend/"
     fi
     
     # Verify critical directories exist
     if [ -d "$FRONTEND_DEST/.next/standalone" ]; then
         echo -e "${GREEN}✅ Standalone build found${NC}"
-        
-        # Verify static files are accessible (not a broken symlink)
-        if [ -d "$FRONTEND_DEST/.next/standalone/.next/static" ] && [ ! -L "$FRONTEND_DEST/.next/standalone/.next/static" ]; then
-            echo -e "${GREEN}✅ Static assets directory found in standalone (copied directly, not symlink)${NC}"
-        elif [ -L "$FRONTEND_DEST/.next/standalone/.next/static" ]; then
-            # If it's still a symlink, check if it's valid
-            if [ -e "$FRONTEND_DEST/.next/standalone/.next/static" ]; then
-                echo -e "${YELLOW}⚠️  Static assets are still a symlink (may break in bundled app)${NC}"
-            else
-                echo -e "${RED}❌ Static assets symlink is broken!${NC}"
-                # Try to fix it by copying files directly
-                if [ -d "$FRONTEND_DEST/.next/static" ]; then
-                    rm -f "$FRONTEND_DEST/.next/standalone/.next/static"
-                    mkdir -p "$FRONTEND_DEST/.next/standalone/.next"
-                    if command -v rsync >/dev/null 2>&1; then
-                        rsync -av "$FRONTEND_DEST/.next/static/" "$FRONTEND_DEST/.next/standalone/.next/static/"
-                    else
-                        cp -a "$FRONTEND_DEST/.next/static" "$FRONTEND_DEST/.next/standalone/.next/"
-                    fi
-                    echo -e "${GREEN}✅ Fixed broken symlink by copying static files directly${NC}"
-                fi
-            fi
+        # Check if static symlink exists in standalone directory
+        if [ -L "$FRONTEND_DEST/.next/standalone/.next/static" ] || [ -d "$FRONTEND_DEST/.next/standalone/.next/static" ]; then
+            echo -e "${GREEN}✅ Static assets symlink found in standalone directory${NC}"
         else
-            echo -e "${YELLOW}⚠️  Static assets directory missing in standalone${NC}"
+            echo -e "${YELLOW}⚠️  Static assets symlink missing in standalone - checking if static directory exists${NC}"
+            # If symlink is broken, we need to ensure static directory is accessible
+            if [ -d "$FRONTEND_DEST/.next/static" ]; then
+                echo -e "${YELLOW}⚠️  Static directory exists but symlink is missing - recreating symlink${NC}"
+                # Create the .next directory in standalone if it doesn't exist
+                mkdir -p "$FRONTEND_DEST/.next/standalone/.next"
+                # Create symlink from standalone/.next/static to parent .next/static
+                ln -sf "../../static" "$FRONTEND_DEST/.next/standalone/.next/static"
+                echo -e "${GREEN}✅ Recreated static assets symlink${NC}"
+            fi
         fi
     else
         echo -e "${YELLOW}⚠️  Standalone build not found - frontend may not work${NC}"
