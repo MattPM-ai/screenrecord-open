@@ -242,6 +242,16 @@ if [ $? -eq 0 ]; then
     # Verify standalone build exists
     if [ -d ".next/standalone" ]; then
         echo -e "${GREEN}✅ Standalone build created${NC}"
+        
+        # Ensure static files are accessible from standalone directory
+        # Next.js standalone mode expects .next/static to be at .next/standalone/.next/static
+        if [ -d ".next/static" ] && [ ! -d ".next/standalone/.next/static" ] && [ ! -L ".next/standalone/.next/static" ]; then
+            echo -e "${YELLOW}📦 Ensuring static files are accessible from standalone directory...${NC}"
+            mkdir -p ".next/standalone/.next"
+            # Copy static directory (not symlink) to ensure it works in bundled app
+            cp -r ".next/static" ".next/standalone/.next/static"
+            echo -e "${GREEN}✅ Static files copied to standalone directory${NC}"
+        fi
     else
         echo -e "${YELLOW}⚠️  Standalone build not found - frontend may require full node_modules${NC}"
     fi
