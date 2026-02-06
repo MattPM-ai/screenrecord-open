@@ -15,7 +15,7 @@
 'use client'
 
 import { useState, useEffect, FormEvent } from 'react'
-import { getDefaultOrganisation, type Organisation, type OrganisationUser } from '@/lib/localTypes'
+import { getDefaultOrganisations, getDefaultOrganisationUsers, type Organisation, type OrganisationUser } from '@/lib/localTypes'
 import { optInWeeklyReports, optOutWeeklyReports, getOptedInAccounts, OptedInAccount } from '@/lib/weeklyReportsAPI'
 
 interface WeeklyReportsEmailSettingsProps {
@@ -47,8 +47,8 @@ export default function WeeklyReportsEmailSettings({ accountId, ownerEmail }: We
         setLoading(true)
         setError('')
         
-        // Use default organization for local/bundled app (no auth backend)
-        setOrganisations([getDefaultOrganisation(accountId)])
+        // Load organizations (use default for local/bundled app)
+        setOrganisations(getDefaultOrganisations(accountId))
         
         // Load opted-in accounts
         setLoadingOptedIn(true)
@@ -84,8 +84,14 @@ export default function WeeklyReportsEmailSettings({ accountId, ownerEmail }: We
         setLoadingUsers(true)
         const orgId = Number(selectedOrgId)
         if (!isNaN(orgId)) {
-          // For local/bundled app, no users available (no auth backend)
+          // Get all users with pagination
           const allUsers: OrganisationUser[] = []
+          let page = 0
+          const limit = 100
+          let hasMore = true
+
+          // For local version, use default users
+          allUsers.push(...getDefaultOrganisationUsers())
 
           setUsers(allUsers)
         }

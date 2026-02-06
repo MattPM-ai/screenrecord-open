@@ -73,9 +73,6 @@ export const optInWeeklyReports = async (data: WeeklyReportOptInRequest): Promis
   try {
     const response = await fetch('/api/reports/weekly/opt-in', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(data),
     })
 
@@ -108,9 +105,6 @@ export const optOutWeeklyReports = async (data: WeeklyReportOptOutRequest): Prom
   try {
     const response = await fetch('/api/reports/weekly/opt-out', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(data),
     })
 
@@ -158,9 +152,6 @@ export const getOptedInAccounts = async (accountId: number): Promise<OptedInAcco
   try {
     const response = await fetch(`/api/reports/weekly/opted-in/${accountId}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
     })
 
     if (!response.ok) {

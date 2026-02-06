@@ -21,7 +21,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-// Login not available in local/bundled app (no auth backend)
+// Note: Login not available in bundled/local app
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -54,9 +54,14 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    // Login not available in local/bundled app
-    setError('Authentication is not available in the local bundled app');
-    setLoading(false);
+    try {
+      // For local bundled app, authentication is not available
+      throw new Error('Authentication is not available in the local bundled app');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

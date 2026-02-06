@@ -16,7 +16,7 @@
 'use client'
 
 import { useState, FormEvent, useEffect } from 'react'
-import { getDefaultUser, getDefaultOrganisation, type Organisation, type OrganisationUser } from '@/lib/localTypes'
+import { getDefaultUser, getDefaultOrganisations, type Organisation, type OrganisationUser } from '@/lib/localTypes'
 
 const GEMINI_API_KEY_STORAGE_KEY = 'gemini_api_key'
 
@@ -120,14 +120,15 @@ export default function WeeklyReportForm({ onSubmit }: WeeklyReportFormProps) {
         setLoading(true)
         setError('')
 
-        // Use default user for local/bundled app (no auth backend)
+        // Get user profile to retrieve accountId
         const userProfile = getDefaultUser()
+        // Use default account ID (0) for local version if not available
         const accountIdValue = userProfile.account_id ?? 0
         setAccountId(accountIdValue)
 
-        // Use default organization for local/bundled app
-        const defaultOrg = getDefaultOrganisation(accountIdValue)
-        setOrganisations([defaultOrg])
+        // For local version, use default organization instead of fetching from API
+        // This avoids 404 errors when the organisations API is not available
+        setOrganisations(getDefaultOrganisations(accountIdValue))
         setSelectedOrgId('0')
 
         // Generate weeks for current year
@@ -140,10 +141,9 @@ export default function WeeklyReportForm({ onSubmit }: WeeklyReportFormProps) {
         setSelectedWeekStart(currentMonday)
       } catch (err) {
         console.error('Failed to load form data:', err)
-        // Set defaults for local version
+        // Even if profile fails, set defaults for local version
         setAccountId(0)
-        const defaultOrg = getDefaultOrganisation(0)
-        setOrganisations([defaultOrg])
+        setOrganisations(getDefaultOrganisations(0))
         setSelectedOrgId('0')
         setError('') // Don't show error for local version
       } finally {
