@@ -120,48 +120,23 @@ function signAppBundle() {
   }
   console.log('');
 
-  // Sign the main executable(s)
-  // Tauri may create the executable with a sanitized name (e.g., "Screenjournal" from "ScreenJournal Tracker")
-  const macosDir = path.join(appBundlePath, 'Contents', 'MacOS');
-  if (fs.existsSync(macosDir)) {
-    console.log('🔏 Signing main executable(s)...');
-    const executables = fs.readdirSync(macosDir).filter(file => {
-      const filePath = path.join(macosDir, file);
-      try {
-        const stat = fs.lstatSync(filePath);
-        return stat.isFile() && (stat.mode & parseInt('111', 8)) !== 0; // Check if executable
-      } catch {
-        return false;
-      }
-    });
-    
-    if (executables.length === 0) {
-      console.warn('⚠️  No executables found in MacOS directory');
-    } else {
+  // Sign the main executable
+  const mainExecutable = path.join(appBundlePath, 'Contents', 'MacOS', path.basename(appBundlePath, '.app'));
+  if (fs.existsSync(mainExecutable)) {
+    console.log('🔏 Signing main executable...');
+    try {
       const { signBinary } = require('./lib/signing');
-      let signedCount = 0;
-      for (const exe of executables) {
-        const exePath = path.join(macosDir, exe);
-        try {
-          const result = signBinary(exePath, entitlementsPath, signingIdentity);
-          if (result.success) {
-            console.log(`  ✅ Signed: ${exe}`);
-            signedCount++;
-          } else {
-            console.error(`  ❌ Failed to sign ${exe}: ${result.error}`);
-            return 1;
-          }
-        } catch (error) {
-          console.error(`  ❌ Failed to sign ${exe}: ${error.message}`);
-          return 1;
-        }
+      const result = signBinary(mainExecutable, entitlementsPath, signingIdentity);
+      if (result.success) {
+        console.log('✅ Main executable signed successfully!\n');
+      } else {
+        console.error(`❌ Failed to sign main executable: ${result.error}`);
+        return 1;
       }
-      if (signedCount > 0) {
-        console.log(`✅ Signed ${signedCount} main executable(s) successfully!\n`);
-      }
+    } catch (error) {
+      console.error('❌ Failed to sign main executable:', error.message);
+      return 1;
     }
-  } else {
-    console.warn('⚠️  MacOS directory not found in app bundle');
   }
 
   // Sign the app bundle (without --deep, since we've signed everything explicitly)
