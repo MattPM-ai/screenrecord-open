@@ -330,27 +330,19 @@ echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC
     FRONTEND_DEST="$TAURI_RESOURCES_DIR/frontend/sj-tracker-frontend"
     
     # First, copy everything except .next (we'll handle that separately)
-    # IMPORTANT: Use --no-xattrs to avoid extended attributes that can break code signing
     echo -e "${YELLOW}   Copying frontend files...${NC}"
     if command -v rsync >/dev/null 2>&1; then
         # Copy everything except .next and .git
-        # --no-xattrs: Don't preserve extended attributes (can break code signing)
-        # -a: Archive mode (preserves permissions, timestamps, but not xattrs)
-        rsync -a --no-xattrs "$FRONTEND_SRC/" "$FRONTEND_DEST/" \
+        rsync -av "$FRONTEND_SRC/" "$FRONTEND_DEST/" \
             --exclude='.git' \
             --exclude='.next' \
             --exclude='node_modules/.cache'
     else
         # Use cp - exclude .next and .git manually
-        # -R: Recursive, -p: Preserve permissions/timestamps (but not xattrs)
         mkdir -p "$FRONTEND_DEST"
-        cp -Rp "$FRONTEND_SRC"/* "$FRONTEND_DEST/" 2>/dev/null || true
-        cp -Rp "$FRONTEND_SRC"/.[!.]* "$FRONTEND_DEST/" 2>/dev/null || true
+        cp -a "$FRONTEND_SRC"/* "$FRONTEND_DEST/" 2>/dev/null || true
+        cp -a "$FRONTEND_SRC"/.[!.]* "$FRONTEND_DEST/" 2>/dev/null || true
         rm -rf "$FRONTEND_DEST/.git" "$FRONTEND_DEST/.next" 2>/dev/null || true
-        # Strip extended attributes to ensure clean files for code signing
-        if command -v xattr >/dev/null 2>&1; then
-            xattr -rc "$FRONTEND_DEST" 2>/dev/null || true
-        fi
     fi
     
     # Now handle .next directory structure properly
@@ -362,41 +354,25 @@ echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC
             echo -e "${YELLOW}   Copying standalone build...${NC}"
             mkdir -p "$FRONTEND_DEST/.next/standalone"
             if command -v rsync >/dev/null 2>&1; then
-                # --no-xattrs: Don't preserve extended attributes (can break code signing)
-                rsync -a --no-xattrs "$FRONTEND_SRC/.next/standalone/" "$FRONTEND_DEST/.next/standalone/" --exclude='.next'
+                rsync -av "$FRONTEND_SRC/.next/standalone/" "$FRONTEND_DEST/.next/standalone/" --exclude='.next'
             else
-                cp -Rp "$FRONTEND_SRC/.next/standalone"/* "$FRONTEND_DEST/.next/standalone/" 2>/dev/null || true
-                # Strip extended attributes
-                if command -v xattr >/dev/null 2>&1; then
-                    xattr -rc "$FRONTEND_DEST/.next/standalone" 2>/dev/null || true
-                fi
+                cp -a "$FRONTEND_SRC/.next/standalone"/* "$FRONTEND_DEST/.next/standalone/" 2>/dev/null || true
             fi
             
             # CRITICAL FIX: Copy static files directly into standalone/.next/static instead of using symlinks
             # This ensures static files are always accessible regardless of working directory
-            # First, remove any symlinks that might have been copied from the source
-            if [ -L "$FRONTEND_DEST/.next/standalone/.next/static" ] 2>/dev/null; then
-                echo -e "${YELLOW}   Removing existing symlink in standalone directory...${NC}"
-                rm -f "$FRONTEND_DEST/.next/standalone/.next/static"
-            fi
-            
             if [ -d "$FRONTEND_SRC/.next/static" ]; then
-                echo -e "${YELLOW}   Copying static files directly into standalone directory (replacing any symlink)...${NC}"
+                echo -e "${YELLOW}   Copying static files into standalone directory (replacing symlink)...${NC}"
                 mkdir -p "$FRONTEND_DEST/.next/standalone/.next"
                 
-                # Remove any existing symlink or directory to ensure clean copy
+                # Remove any existing symlink or directory
                 rm -rf "$FRONTEND_DEST/.next/standalone/.next/static" 2>/dev/null || true
                 
                 # Copy static files directly (not as symlink)
-                # --no-xattrs: Don't preserve extended attributes (can break code signing)
                 if command -v rsync >/dev/null 2>&1; then
-                    rsync -a --no-xattrs "$FRONTEND_SRC/.next/static/" "$FRONTEND_DEST/.next/standalone/.next/static/"
+                    rsync -av "$FRONTEND_SRC/.next/static/" "$FRONTEND_DEST/.next/standalone/.next/static/"
                 else
-                    cp -Rp "$FRONTEND_SRC/.next/static" "$FRONTEND_DEST/.next/standalone/.next/"
-                    # Strip extended attributes
-                    if command -v xattr >/dev/null 2>&1; then
-                        xattr -rc "$FRONTEND_DEST/.next/standalone/.next/static" 2>/dev/null || true
-                    fi
+                    cp -a "$FRONTEND_SRC/.next/static" "$FRONTEND_DEST/.next/standalone/.next/"
                 fi
                 echo -e "${GREEN}   ✅ Static files copied directly into standalone directory${NC}"
             fi
@@ -406,26 +382,18 @@ echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC
                 echo -e "${YELLOW}   Copying .next/static directory...${NC}"
                 mkdir -p "$FRONTEND_DEST/.next"
                 if command -v rsync >/dev/null 2>&1; then
-                    rsync -a --no-xattrs "$FRONTEND_SRC/.next/static/" "$FRONTEND_DEST/.next/static/"
+                    rsync -av "$FRONTEND_SRC/.next/static/" "$FRONTEND_DEST/.next/static/"
                 else
-                    cp -Rp "$FRONTEND_SRC/.next/static" "$FRONTEND_DEST/.next/"
-                    # Strip extended attributes
-                    if command -v xattr >/dev/null 2>&1; then
-                        xattr -rc "$FRONTEND_DEST/.next/static" 2>/dev/null || true
-                    fi
+                    cp -a "$FRONTEND_SRC/.next/static" "$FRONTEND_DEST/.next/"
                 fi
             fi
         else
             # If no standalone build, copy entire .next directory
             echo -e "${YELLOW}   Copying .next directory (no standalone build found)...${NC}"
             if command -v rsync >/dev/null 2>&1; then
-                rsync -a --no-xattrs "$FRONTEND_SRC/.next/" "$FRONTEND_DEST/.next/"
+                rsync -av "$FRONTEND_SRC/.next/" "$FRONTEND_DEST/.next/"
             else
-                cp -Rp "$FRONTEND_SRC/.next" "$FRONTEND_DEST/"
-                # Strip extended attributes
-                if command -v xattr >/dev/null 2>&1; then
-                    xattr -rc "$FRONTEND_DEST/.next" 2>/dev/null || true
-                fi
+                cp -a "$FRONTEND_SRC/.next" "$FRONTEND_DEST/"
             fi
         fi
     fi
@@ -438,42 +406,25 @@ echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC
         if [ -d "$FRONTEND_DEST/.next/standalone/.next/static" ] && [ ! -L "$FRONTEND_DEST/.next/standalone/.next/static" ]; then
             echo -e "${GREEN}✅ Static assets directory found in standalone (copied directly, not symlink)${NC}"
         elif [ -L "$FRONTEND_DEST/.next/standalone/.next/static" ]; then
-            # If it's still a symlink, replace it with actual files
-            echo -e "${YELLOW}⚠️  Static assets are still a symlink - replacing with direct copy...${NC}"
-            if [ -d "$FRONTEND_DEST/.next/static" ]; then
-                rm -f "$FRONTEND_DEST/.next/standalone/.next/static"
-                mkdir -p "$FRONTEND_DEST/.next/standalone/.next"
-                if command -v rsync >/dev/null 2>&1; then
-                    rsync -a --no-xattrs "$FRONTEND_DEST/.next/static/" "$FRONTEND_DEST/.next/standalone/.next/static/"
-                else
-                    cp -Rp "$FRONTEND_DEST/.next/static" "$FRONTEND_DEST/.next/standalone/.next/"
-                    # Strip extended attributes
-                    if command -v xattr >/dev/null 2>&1; then
-                        xattr -rc "$FRONTEND_DEST/.next/standalone/.next/static" 2>/dev/null || true
-                    fi
-                fi
-                echo -e "${GREEN}✅ Replaced symlink with direct file copy${NC}"
+            # If it's still a symlink, check if it's valid
+            if [ -e "$FRONTEND_DEST/.next/standalone/.next/static" ]; then
+                echo -e "${YELLOW}⚠️  Static assets are still a symlink (may break in bundled app)${NC}"
             else
-                echo -e "${RED}❌ Static assets symlink is broken and source directory not found!${NC}"
+                echo -e "${RED}❌ Static assets symlink is broken!${NC}"
+                # Try to fix it by copying files directly
+                if [ -d "$FRONTEND_DEST/.next/static" ]; then
+                    rm -f "$FRONTEND_DEST/.next/standalone/.next/static"
+                    mkdir -p "$FRONTEND_DEST/.next/standalone/.next"
+                    if command -v rsync >/dev/null 2>&1; then
+                        rsync -av "$FRONTEND_DEST/.next/static/" "$FRONTEND_DEST/.next/standalone/.next/static/"
+                    else
+                        cp -a "$FRONTEND_DEST/.next/static" "$FRONTEND_DEST/.next/standalone/.next/"
+                    fi
+                    echo -e "${GREEN}✅ Fixed broken symlink by copying static files directly${NC}"
+                fi
             fi
         else
-            # Static directory is missing - copy it directly
-            echo -e "${YELLOW}⚠️  Static assets directory missing in standalone - copying directly...${NC}"
-            if [ -d "$FRONTEND_DEST/.next/static" ]; then
-                mkdir -p "$FRONTEND_DEST/.next/standalone/.next"
-                if command -v rsync >/dev/null 2>&1; then
-                    rsync -a --no-xattrs "$FRONTEND_DEST/.next/static/" "$FRONTEND_DEST/.next/standalone/.next/static/"
-                else
-                    cp -Rp "$FRONTEND_DEST/.next/static" "$FRONTEND_DEST/.next/standalone/.next/"
-                    # Strip extended attributes
-                    if command -v xattr >/dev/null 2>&1; then
-                        xattr -rc "$FRONTEND_DEST/.next/standalone/.next/static" 2>/dev/null || true
-                    fi
-                fi
-                echo -e "${GREEN}✅ Static assets copied directly into standalone directory${NC}"
-            else
-                echo -e "${RED}❌ Source static directory not found at: $FRONTEND_DEST/.next/static${NC}"
-            fi
+            echo -e "${YELLOW}⚠️  Static assets directory missing in standalone${NC}"
         fi
     else
         echo -e "${YELLOW}⚠️  Standalone build not found - frontend may not work${NC}"
@@ -483,16 +434,6 @@ echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC
         echo -e "${GREEN}✅ Static assets directory found${NC}"
     else
         echo -e "${YELLOW}⚠️  Static assets directory not found - frontend will have 404 errors${NC}"
-    fi
-    
-    # CRITICAL: Strip all extended attributes from copied files to ensure clean code signing
-    # Extended attributes can interfere with Tauri's code signing process
-    echo -e "${YELLOW}   Cleaning extended attributes for code signing...${NC}"
-    if command -v xattr >/dev/null 2>&1; then
-        xattr -rc "$FRONTEND_DEST" 2>/dev/null || true
-        echo -e "${GREEN}   ✅ Extended attributes stripped${NC}"
-    else
-        echo -e "${YELLOW}   ⚠️  xattr command not found, skipping extended attribute cleanup${NC}"
     fi
     
     echo -e "${GREEN}✅ Frontend copied to Tauri app${NC}"
