@@ -74,6 +74,12 @@ src-tauri/resources/python/sj-tracker-chat-agent-venv/
 src-tauri/resources/python/sj-tracker-chat-agent/*
 !src-tauri/resources/python/sj-tracker-chat-agent/.gitkeep
 
+# Frontend - ignore copied frontend but keep directory structure
+# The frontend is copied during build via `./build-bundled.sh` from sj-tracker-frontend/
+# Not committed to avoid duplication (source is tracked in sj-tracker-frontend/)
+src-tauri/resources/frontend/sj-tracker-frontend/*
+!src-tauri/resources/frontend/sj-tracker-frontend/.gitkeep
+
 # Temporary download directories used by setup scripts
 .temp-aw-download/
 .temp-ffmpeg-download/
