@@ -237,7 +237,7 @@ pub async fn start_influxdb(app_handle: AppHandle) -> Result<(), String> {
         cmd.env("DOCKER_INFLUXDB_INIT_PASSWORD", "admin123");
         cmd.env("DOCKER_INFLUXDB_INIT_ORG", "screenjournal-org");
         cmd.env("DOCKER_INFLUXDB_INIT_BUCKET", "screenjournal-metrics");
-        cmd.env("DOCKER_INFLUXDB_INIT_ADMIN_TOKEN", "screenjournal-admin-token");
+        cmd.env("DOCKER_INFLUXDB_INIT_ADMIN_TOKEN", "screenjournal-admin-token-change-in-production");
     }
     
     cmd.arg("--http-bind-address").arg("127.0.0.1:8086");
@@ -398,7 +398,7 @@ pub async fn start_collector(app_handle: AppHandle) -> Result<(), String> {
     cmd.env("SERVER_PORT", "8080");
     cmd.env("JWT_SECRET", "screenjournal-bundled-secret-key");
     cmd.env("INFLUXDB2_URL", "http://localhost:8086");
-    cmd.env("INFLUXDB2_TOKEN", "screenjournal-admin-token");
+    cmd.env("INFLUXDB2_TOKEN", "screenjournal-admin-token-change-in-production");
     cmd.env("INFLUXDB2_ORG", "screenjournal-org");
     cmd.env("INFLUXDB2_BUCKET", "screenjournal-metrics");
     cmd.env("STORAGE_BASE_PATH", storage_path.to_string_lossy().as_ref());
@@ -500,7 +500,7 @@ pub async fn start_report_service(app_handle: AppHandle) -> Result<(), String> {
     cmd.env("PORT", "8085");
     cmd.env("HOST", "0.0.0.0");
     cmd.env("INFLUXDB2_URL", "http://localhost:8086");
-    cmd.env("INFLUXDB2_TOKEN", "screenjournal-admin-token");
+    cmd.env("INFLUXDB2_TOKEN", "screenjournal-admin-token-change-in-production");
     cmd.env("INFLUXDB2_ORG", "screenjournal-org");
     cmd.env("INFLUXDB2_BUCKET", "screenjournal-metrics");
     cmd.env("MONGODB_HOST", "localhost");

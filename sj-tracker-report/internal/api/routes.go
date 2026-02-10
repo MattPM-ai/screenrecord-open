@@ -39,6 +39,12 @@ func SetupRoutes(handlers *Handlers) *gin.Engine {
 				weekly.GET("/opted-in/:accountId", handlers.GetOptedInAccountsHandler)
 			}
 		}
+
+		// Timeline routes (no auth required for open-source local version)
+		timeline := api.Group("/timeline")
+		{
+			timeline.GET("", handlers.GetTimelineHandler)
+		}
 	}
 
 	// Health check endpoint

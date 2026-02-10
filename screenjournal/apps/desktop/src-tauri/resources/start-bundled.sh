@@ -163,7 +163,7 @@ if wait_for_service "InfluxDB" 8086 30 "http://localhost:8086/health"; then
         SETUP_PASSWORD="admin123"
         SETUP_ORG="screenjournal-org"
         SETUP_BUCKET="screenjournal-metrics"
-        SETUP_TOKEN="screenjournal-admin-token"
+        SETUP_TOKEN="screenjournal-admin-token-change-in-production"
         
         # Call the setup API endpoint
         SETUP_RESPONSE=$(curl -s -X POST http://localhost:8086/api/v2/setup \
@@ -221,7 +221,7 @@ SERVER_HOST=0.0.0.0 \
 SERVER_PORT=8080 \
 JWT_SECRET=screenjournal-bundled-secret-key \
 INFLUXDB2_URL=http://localhost:8086 \
-INFLUXDB2_TOKEN=screenjournal-admin-token \
+INFLUXDB2_TOKEN=screenjournal-admin-token-change-in-production \
 INFLUXDB2_ORG=screenjournal-org \
 INFLUXDB2_BUCKET=screenjournal-metrics \
 STORAGE_BASE_PATH="$STORAGE_DIR" \
@@ -252,7 +252,7 @@ cd "$APP_DATA_DIR"
 PORT=8085 \
 HOST=0.0.0.0 \
 INFLUXDB2_URL=http://localhost:8086 \
-INFLUXDB2_TOKEN=screenjournal-admin-token \
+INFLUXDB2_TOKEN=screenjournal-admin-token-change-in-production \
 INFLUXDB2_ORG=screenjournal-org \
 INFLUXDB2_BUCKET=screenjournal-metrics \
 MONGODB_HOST=localhost \

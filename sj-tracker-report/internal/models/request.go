@@ -70,3 +70,18 @@ type SendWeeklyReportEmailRequest struct {
 	WeekStartDate string       `json:"weekStartDate" binding:"required"` // YYYY-MM-DD - Monday of the week
 }
 
+// TimelineRequest represents the request to get timeline data
+type TimelineRequest struct {
+	UserID    int    `form:"userId"` // Allow 0 for local version
+	AccountID int    `form:"accountId"` // Allow 0 for local version
+	Date      string `form:"date" binding:"required"` // YYYY-MM-DD
+}
+
+// TimelineResponse represents the timeline response
+type TimelineResponse struct {
+	UserID    int                `json:"userId"`
+	AccountID int                `json:"accountId"`
+	Date      string             `json:"date"` // YYYY-MM-DD
+	Events    []TimelineEvent    `json:"events"`
+}
+

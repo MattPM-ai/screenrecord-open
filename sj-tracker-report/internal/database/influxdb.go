@@ -223,6 +223,16 @@ func (c *InfluxDBClient) query(ctx context.Context, fluxQuery string) ([]map[str
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
+		// Log configuration details for debugging (without exposing full token)
+		tokenPreview := ""
+		if len(c.token) > 0 {
+			if len(c.token) > 8 {
+				tokenPreview = c.token[:4] + "..." + c.token[len(c.token)-4:]
+			} else {
+				tokenPreview = "***"
+			}
+		}
+		log.Printf("InfluxDB query failed - URL: %s, Org: %s, Token: %s (preview)", c.url, c.org, tokenPreview)
 		return nil, fmt.Errorf("InfluxDB query failed with status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 

@@ -44,6 +44,7 @@ export default function NavBar() {
   const navLinks = [
     { href: '/', label: 'Chat' },
     { href: '/reports', label: 'Reports' },
+    { href: '/activity', label: 'Timeline' },
   ]
 
   return (

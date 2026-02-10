@@ -4,9 +4,12 @@ go 1.25.4
 
 require (
 	github.com/gin-gonic/gin v1.11.0
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
-	github.com/sashabaranov/go-openai v1.41.2
+	github.com/jung-kurt/gofpdf/v2 v2.17.3
+	github.com/robfig/cron/v3 v3.0.1
+	github.com/sendgrid/sendgrid-go v3.16.1+incompatible
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.mongodb.org/mongo-driver v1.17.6
 )
@@ -22,10 +25,8 @@ require (
 	github.com/go-playground/validator/v10 v10.27.0 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
-	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/jung-kurt/gofpdf/v2 v2.17.3 // indirect
 	github.com/klauspost/compress v1.17.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
@@ -36,9 +37,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/quic-go/qpack v0.5.1 // indirect
 	github.com/quic-go/quic-go v0.54.0 // indirect
-	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/sendgrid/rest v2.6.9+incompatible // indirect
-	github.com/sendgrid/sendgrid-go v3.16.1+incompatible // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.0 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect

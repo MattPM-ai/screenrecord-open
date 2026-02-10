@@ -16,6 +16,20 @@ func main() {
 	}
 
 	// Initialize InfluxDB client
+	// Log configuration (without exposing full token)
+	tokenPreview := ""
+	if len(cfg.InfluxDB.Token) > 0 {
+		if len(cfg.InfluxDB.Token) > 8 {
+			tokenPreview = cfg.InfluxDB.Token[:4] + "..." + cfg.InfluxDB.Token[len(cfg.InfluxDB.Token)-4:]
+		} else {
+			tokenPreview = "***"
+		}
+	} else {
+		tokenPreview = "(empty)"
+	}
+	log.Printf("Initializing InfluxDB connection - URL: %s, Org: %s, Bucket: %s, Token: %s", 
+		cfg.InfluxDB.URL, cfg.InfluxDB.Org, cfg.InfluxDB.Bucket, tokenPreview)
+	
 	influxClient, err := database.NewInfluxDBClient(
 		cfg.InfluxDB.URL,
 		cfg.InfluxDB.Token,
@@ -26,6 +40,7 @@ func main() {
 		log.Fatalf("Failed to connect to InfluxDB: %v", err)
 	}
 	defer influxClient.Close()
+	log.Printf("Successfully initialized InfluxDB client")
 
 	// Initialize MongoDB client (optional - for report caching)
 	var mongoClient *database.MongoDBClient
@@ -87,7 +102,7 @@ func main() {
 	chatTools := services.NewChatTools(influxClient, reportService)
 
 	// Initialize handlers
-	handlers := api.NewHandlers(reportService, taskService, weeklyEmailService, mongoClient, chatTools)
+	handlers := api.NewHandlers(reportService, taskService, weeklyEmailService, mongoClient, chatTools, influxClient)
 
 	// Setup routes
 	router := api.SetupRoutes(handlers)

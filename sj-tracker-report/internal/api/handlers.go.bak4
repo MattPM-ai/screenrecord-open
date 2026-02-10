@@ -2,11 +2,11 @@ package api
 
 import (
 	"fmt"
-	"net/http"
 	"sj-tracker-report/internal/database"
 	"sj-tracker-report/internal/models"
 	"sj-tracker-report/internal/services"
 	"sj-tracker-report/internal/utils"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -209,7 +209,7 @@ func (h *Handlers) GenerateWeeklyReportHandler(c *gin.Context) {
 		// Create task and mark it as completed with cached report
 		// Create a temporary GenerateReportRequest for task creation
 		tempRequest := models.GenerateReportRequest{
-			AccountID: req.AccountID,
+			AccountID: 0, // Always 0 for local version
 			Users:     req.Users,
 			Org:       req.Org,
 			OrgID:     req.OrgID,
@@ -236,7 +236,7 @@ func (h *Handlers) GenerateWeeklyReportHandler(c *gin.Context) {
 	// No existing task or cache - create new task and start async generation
 	// Create a temporary GenerateReportRequest for task creation
 	tempRequest := models.GenerateReportRequest{
-		AccountID: req.AccountID,
+		AccountID: 0, // Always 0 for local version
 		Users:     req.Users,
 		Org:       req.Org,
 		OrgID:     req.OrgID,
@@ -524,25 +524,6 @@ func (h *Handlers) GetTimelineHandler(c *gin.Context) {
 		return
 	}
 
-	// Validate that userId is provided (allow 0 for local version)
-	// Note: Gin's binding:"required" treats 0 as empty for integers, so we validate manually
-	// Check if userId was actually provided in query string
-	userIdStr := c.Query("userId")
-	if userIdStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "userId is required"})
-		return
-	}
-	if req.UserID < 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "userId must be a non-negative number"})
-		return
-	}
-
-	// Validate date is provided
-	if req.Date == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "date is required (YYYY-MM-DD format)"})
-		return
-	}
-
 	if h.influxClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "InfluxDB client not available"})
 		return
@@ -559,11 +540,13 @@ func (h *Handlers) GetTimelineHandler(c *gin.Context) {
 	startDate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
 	endDate := time.Date(date.Year(), date.Month(), date.Day(), 23, 59, 59, 999999999, date.Location())
 
-	// Use orgID = 0 for local version (allow 0 for open-source)
+	// Hardcode IDs to 0 for open-source local version (ignore any values sent from client)
+	accountID := 0
 	orgID := 0
+	userID := 0
 
 	// Query screen timeline data
-	timelineData, err := h.influxClient.QueryScreenTimeline(req.AccountID, orgID, req.UserID, startDate, endDate)
+	timelineData, err := h.influxClient.QueryScreenTimeline(0, orgID, 0, startDate, endDate)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to query timeline: %v", err)})
 		return
@@ -583,12 +566,11 @@ func (h *Handlers) GetTimelineHandler(c *gin.Context) {
 	}
 
 	response := models.TimelineResponse{
-		UserID:    req.UserID,
-		AccountID: req.AccountID,
+		UserID:    0, // Always 0 for local version
+		AccountID: 0, // Always 0 for local version
 		Date:      req.Date,
 		Events:    events,
 	}
 
 	c.JSON(http.StatusOK, response)
 }
-
