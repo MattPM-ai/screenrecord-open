@@ -142,7 +142,7 @@ jobs:
         working-directory: screenjournal
 
       # =========================================================================
-      # Setup ActivityWatch and FFmpeg binaries (required for desktop app)
+      # Setup ActivityWatch, FFmpeg, and Whisper (required for desktop app)
       # =========================================================================
       - name: Setup ActivityWatch
         run: npm run setup-aw
@@ -150,6 +150,10 @@ jobs:
 
       - name: Setup FFmpeg
         run: npm run setup-ffmpeg
+        working-directory: screenjournal/apps/desktop
+
+      - name: Setup Whisper model
+        run: npm run setup-whisper
         working-directory: screenjournal/apps/desktop
 
       # =========================================================================
