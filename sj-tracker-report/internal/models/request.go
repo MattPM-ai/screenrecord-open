@@ -85,3 +85,37 @@ type TimelineResponse struct {
 	Events    []TimelineEvent    `json:"events"`
 }
 
+
+// AudioTranscriptRequest represents the request to get audio transcripts
+type AudioTranscriptRequest struct {
+	UserID    int    `form:"userId" binding:"required"`
+	AccountID int    `form:"accountId" binding:"required"`
+	OrgID     int    `form:"orgId"`     // Optional
+	Date      string `form:"date"`      // Optional: YYYY-MM-DD format to filter by specific date
+}
+
+// AudioTranscriptResponse represents the audio transcript response
+type AudioTranscriptResponse struct {
+	UserID     int                           `json:"userId"`
+	AccountID  int                           `json:"accountId"`
+	OrgID      int                           `json:"orgId,omitempty"`
+	Transcripts []AudioTranscriptGroup       `json:"transcripts"`
+}
+
+// AudioTranscriptGroup represents a group of transcripts with the same audio URL
+type AudioTranscriptGroup struct {
+	AudioURL   string                 `json:"audioUrl"`
+	Transcripts []AudioTranscriptRecord `json:"transcripts"` // Sorted by time
+}
+
+// AudioTranscriptRecord represents a single audio transcript record
+type AudioTranscriptRecord struct {
+	Time      string                 `json:"time"`      // ISO 8601 timestamp
+	AccountID int                    `json:"accountId"`
+	OrgID     int                    `json:"orgId,omitempty"`
+	UserID    int                    `json:"userId"`
+	Org       string                 `json:"org,omitempty"`
+	User      string                 `json:"user,omitempty"`
+	Hostname  string                 `json:"hostname,omitempty"`
+	Fields    map[string]interface{} `json:"fields"` // All other fields from the table
+}

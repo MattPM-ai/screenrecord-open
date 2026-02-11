@@ -45,6 +45,15 @@ func SetupRoutes(handlers *Handlers) *gin.Engine {
 		{
 			timeline.GET("", handlers.GetTimelineHandler)
 		}
+
+		// Audio transcript routes - non-admins can access but only their own data (checked in handler)
+		audioTranscripts := api.Group("/audio-transcripts")
+		{
+			audioTranscripts.GET("", handlers.GetAudioTranscriptsHandler)
+		}
+
+		// Audio file serving route - serves local audio files
+		api.GET("/audio-file", handlers.ServeAudioFileHandler)
 	}
 
 	// Health check endpoint

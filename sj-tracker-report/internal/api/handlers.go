@@ -3,11 +3,17 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"runtime"
 	"sj-tracker-report/internal/database"
 	"sj-tracker-report/internal/models"
 	"sj-tracker-report/internal/services"
 	"sj-tracker-report/internal/utils"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -592,3 +598,285 @@ func (h *Handlers) GetTimelineHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// GetAudioTranscriptsHandler handles GET /api/audio-transcripts
+// Returns all audio transcripts for a specific user, grouped by audio URL and sorted by time
+func (h *Handlers) GetAudioTranscriptsHandler(c *gin.Context) {
+	// Manually extract query parameters (like timeline handler does)
+	// This allows userId=0 and accountId=0 for local version
+	userIdStr := c.Query("userId")
+	if userIdStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "userId is required"})
+		return
+	}
+	
+	accountIdStr := c.Query("accountId")
+	if accountIdStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "accountId is required"})
+		return
+	}
+	
+	userId, err := strconv.Atoi(userIdStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "userId must be a valid number"})
+		return
+	}
+	
+	accountId, err := strconv.Atoi(accountIdStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "accountId must be a valid number"})
+		return
+	}
+	
+	// Validate that userId and accountId are non-negative (allow 0 for local version)
+	if userId < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "userId must be a non-negative number"})
+		return
+	}
+	if accountId < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "accountId must be a non-negative number"})
+		return
+	}
+	
+	// Optional parameters
+	orgId := 0
+	orgIdStr := c.Query("orgId")
+	if orgIdStr != "" {
+		orgId, err = strconv.Atoi(orgIdStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "orgId must be a valid number"})
+			return
+		}
+	}
+	
+	date := c.Query("date")
+
+	if h.influxClient == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "InfluxDB client not available"})
+		return
+	}
+
+	// Parse date if provided
+	var startDate, endDate *time.Time
+	if date != "" {
+		parsedDate, err := utils.ParseDate(date)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date format, expected YYYY-MM-DD"})
+			return
+		}
+		// Set time range for the specific date (start of day to end of day)
+		start := time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), 0, 0, 0, 0, parsedDate.Location())
+		end := time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), 23, 59, 59, 999999999, parsedDate.Location())
+		startDate = &start
+		endDate = &end
+	}
+
+	// Query audio transcripts from InfluxDB
+	transcripts, err := h.influxClient.QueryAudioTranscript(accountId, orgId, userId, startDate, endDate)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to query audio transcripts: %v", err)})
+		return
+	}
+
+	// Convert to response format and group by audio_url
+	transcriptRecords := make([]models.AudioTranscriptRecord, 0, len(transcripts))
+	for _, transcript := range transcripts {
+		transcriptRecords = append(transcriptRecords, models.AudioTranscriptRecord{
+			Time:      transcript.Time.Format(time.RFC3339),
+			AccountID: transcript.AccountID,
+			OrgID:     transcript.OrgID,
+			UserID:    transcript.UserID,
+			Org:       transcript.Org,
+			User:      transcript.User,
+			Hostname:  transcript.Hostname,
+			Fields:    transcript.Fields,
+		})
+	}
+
+	// Group transcripts by audio_path (the field name used in InfluxDB) and convert local paths to serving URLs
+	groupsByURL := make(map[string][]models.AudioTranscriptRecord)
+	for _, record := range transcriptRecords {
+		audioURL := ""
+		// Check for audio_path field (the actual field name in InfluxDB)
+		// Also check audio_url for backwards compatibility
+		var audioPathStr string
+		var found bool
+		
+		if pathVal, ok := record.Fields["audio_path"]; ok {
+			if pathStr, ok := pathVal.(string); ok && pathStr != "" {
+				audioPathStr = pathStr
+				found = true
+			}
+		} else if urlVal, ok := record.Fields["audio_url"]; ok {
+			// Fallback to audio_url for backwards compatibility
+			if urlStr, ok := urlVal.(string); ok && urlStr != "" {
+				audioPathStr = urlStr
+				found = true
+			}
+		}
+		
+		if found {
+			// Convert local file path to a URL that can be served by the backend
+			// If it's already a URL (http/https), use it as-is
+			// Otherwise, convert local path to /api/audio-file?path=...
+			if strings.HasPrefix(audioPathStr, "http://") || strings.HasPrefix(audioPathStr, "https://") {
+				audioURL = audioPathStr
+			} else if audioPathStr != "" {
+				// It's a local file path - convert to serving URL
+				// URL encode the path parameter
+				encodedPath := url.QueryEscape(audioPathStr)
+				audioURL = fmt.Sprintf("/api/audio-file?path=%s", encodedPath)
+			}
+		}
+		// Use empty string as key if no audio_path/audio_url found
+		groupsByURL[audioURL] = append(groupsByURL[audioURL], record)
+	}
+
+	// Sort transcripts within each group by time, then create groups
+	transcriptGroups := make([]models.AudioTranscriptGroup, 0, len(groupsByURL))
+	for audioURL, records := range groupsByURL {
+		// Sort records by time (ascending)
+		sort.Slice(records, func(i, j int) bool {
+			timeI, errI := time.Parse(time.RFC3339, records[i].Time)
+			timeJ, errJ := time.Parse(time.RFC3339, records[j].Time)
+			if errI != nil || errJ != nil {
+				return records[i].Time < records[j].Time // Fallback to string comparison
+			}
+			return timeI.Before(timeJ)
+		})
+
+		transcriptGroups = append(transcriptGroups, models.AudioTranscriptGroup{
+			AudioURL:    audioURL,
+			Transcripts: records,
+		})
+	}
+
+	// Sort groups by the first transcript's time (earliest first)
+	sort.Slice(transcriptGroups, func(i, j int) bool {
+		if len(transcriptGroups[i].Transcripts) == 0 || len(transcriptGroups[j].Transcripts) == 0 {
+			return false
+		}
+		timeI, errI := time.Parse(time.RFC3339, transcriptGroups[i].Transcripts[0].Time)
+		timeJ, errJ := time.Parse(time.RFC3339, transcriptGroups[j].Transcripts[0].Time)
+		if errI != nil || errJ != nil {
+			return transcriptGroups[i].Transcripts[0].Time < transcriptGroups[j].Transcripts[0].Time
+		}
+		return timeI.Before(timeJ)
+	})
+
+	response := models.AudioTranscriptResponse{
+		UserID:     userId,
+		AccountID:  accountId,
+		OrgID:      orgId,
+		Transcripts: transcriptGroups,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// ServeAudioFileHandler handles GET /api/audio-file
+// Serves local audio files from the filesystem
+// Security: Validates that the file path is within the expected audio directory
+func (h *Handlers) ServeAudioFileHandler(c *gin.Context) {
+	// Get the file path from query parameter
+	filePath := c.Query("path")
+	if filePath == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "path parameter is required"})
+		return
+	}
+
+	// Validate and resolve the file path
+	// Audio files can be stored in multiple locations:
+	// - ~/.screenjournal/audio/ (legacy/default)
+	// - ~/Library/Application Support/com.screenjournal.tracker/audio/ (macOS Tauri app)
+	// - %APPDATA%/com.screenjournal.tracker/audio/ (Windows Tauri app)
+	// We need to ensure the path is within one of these directories to prevent directory traversal attacks
+	
+	// Clean the provided path
+	cleanedPath := filepath.Clean(filePath)
+	
+	// Must be an absolute path
+	if !filepath.IsAbs(cleanedPath) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "path must be absolute"})
+		return
+	}
+	
+	// Resolve any symlinks and get the absolute path
+	absPath, err := filepath.Abs(cleanedPath)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid file path"})
+		return
+	}
+	
+	// Security check: ensure path doesn't contain ".." after cleaning
+	if strings.Contains(absPath, "..") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "access denied: invalid path"})
+		return
+	}
+	
+	// Get the user's home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get home directory"})
+		return
+	}
+	
+	// List of allowed base directories for audio files
+	allowedBaseDirs := []string{
+		filepath.Join(homeDir, ".screenjournal", "audio"),                    // Legacy/default
+		filepath.Join(homeDir, "Library", "Application Support", "com.screenjournal.tracker", "audio"), // macOS Tauri
+	}
+	
+	// On Windows, also check AppData
+	if runtime.GOOS == "windows" {
+		appData := os.Getenv("APPDATA")
+		if appData != "" {
+			allowedBaseDirs = append(allowedBaseDirs, filepath.Join(appData, "com.screenjournal.tracker", "audio"))
+		}
+	}
+	
+	// Check if the file path is within any of the allowed base directories
+	pathAllowed := false
+	for _, baseDir := range allowedBaseDirs {
+		baseAbs, err := filepath.Abs(baseDir)
+		if err != nil {
+			continue // Skip invalid base dir
+		}
+		
+		// Check if the path is within this base directory
+		relPath, err := filepath.Rel(baseAbs, absPath)
+		if err == nil && !strings.HasPrefix(relPath, "..") {
+			pathAllowed = true
+			break
+		}
+	}
+	
+	if !pathAllowed {
+		c.JSON(http.StatusForbidden, gin.H{"error": "access denied: file path outside allowed directories"})
+		return
+	}
+
+	// Check if file exists
+	fileInfo, err := os.Stat(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "audio file not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to access file"})
+		return
+	}
+
+	// Ensure it's a file, not a directory
+	if fileInfo.IsDir() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "path points to a directory, not a file"})
+		return
+	}
+
+	// Set appropriate headers for audio file
+	c.Header("Content-Type", "audio/mp4")
+	c.Header("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
+	c.Header("Accept-Ranges", "bytes")
+
+	// Serve the file
+	c.File(absPath)
+}

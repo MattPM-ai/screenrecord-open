@@ -85,6 +85,19 @@ type ScreenTimeline struct {
 	TimeOffset       string // Format: "00:15", "00:20" (MM:SS)
 }
 
+// AudioTranscript represents audio transcript data from InfluxDB
+// This structure holds all fields from the audio_transcript measurement
+type AudioTranscript struct {
+	Time      time.Time
+	AccountID int
+	OrgID     int
+	UserID    int
+	Org       string
+	User      string
+	Hostname  string
+	Fields    map[string]interface{} // All other fields (text, speaker, duration_ms, audio_url, etc.)
+}
+
 // QueryResponse represents the response from InfluxDB 2.0 Flux query
 type QueryResponse struct {
 	Results []struct {
@@ -784,4 +797,128 @@ func getStringValue(row map[string]interface{}, key string) string {
 		return val
 	}
 	return ""
+}
+
+// QueryAudioTranscript queries the audio_transcript measurement by user ID
+// Returns all rows for the specified user with all fields preserved
+// If startDate and endDate are provided, filters by that date range. Otherwise uses -30d to now()
+func (c *InfluxDBClient) QueryAudioTranscript(accountID, orgID, userID int, startDate, endDate *time.Time) ([]AudioTranscript, error) {
+	// Determine date range for query
+	var startDateStr, endDateStr string
+	if startDate != nil && endDate != nil {
+		// Use provided date range
+		startDateStr = startDate.Format(time.RFC3339)
+		endDateStr = endDate.Format(time.RFC3339)
+	} else {
+		// Default: last 30 days
+		startDateStr = "-30d"
+		endDateStr = "now()"
+	}
+
+	// Flux query for InfluxDB 2.0
+	// orgID is optional (0 means don't filter by org_id)
+	query := fmt.Sprintf(`from(bucket: "%s")
+  |> range(start: %s, stop: %s)
+  |> filter(fn: (r) => r["_measurement"] == "audio_transcript")
+  |> filter(fn: (r) => r["account_id"] == "%d")
+  |> filter(fn: (r) => r["user_id"] == "%d")
+  |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+  |> sort(columns: ["_time"])`,
+		c.bucket,
+		startDateStr,
+		endDateStr,
+		accountID,
+		userID,
+	)
+
+	// Add org_id filter only if orgID is not 0
+	if orgID != 0 {
+		query = fmt.Sprintf(`from(bucket: "%s")
+  |> range(start: %s, stop: %s)
+  |> filter(fn: (r) => r["_measurement"] == "audio_transcript")
+  |> filter(fn: (r) => r["account_id"] == "%d")
+  |> filter(fn: (r) => r["org_id"] == "%d")
+  |> filter(fn: (r) => r["user_id"] == "%d")
+  |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+  |> sort(columns: ["_time"])`,
+			c.bucket,
+			startDateStr,
+			endDateStr,
+			accountID,
+			orgID,
+			userID,
+		)
+	}
+
+	rows, err := c.query(context.Background(), query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query audio_transcript: %w", err)
+	}
+
+	var records []AudioTranscript
+	for _, row := range rows {
+		transcript := AudioTranscript{
+			Fields: make(map[string]interface{}),
+		}
+
+		// Parse time using helper function (Flux uses _time)
+		if timeVal, exists := row["_time"]; exists {
+			if parsedTime, err := parseTime(timeVal); err == nil {
+				transcript.Time = parsedTime
+			} else {
+				log.Printf("WARNING: Could not parse time in audio transcript: %v (type: %T), error: %v", timeVal, timeVal, err)
+			}
+		} else if timeVal, exists := row["time"]; exists {
+			// Fallback to "time" field
+			if parsedTime, err := parseTime(timeVal); err == nil {
+				transcript.Time = parsedTime
+			} else {
+				log.Printf("WARNING: Could not parse time in audio transcript: %v (type: %T), error: %v", timeVal, timeVal, err)
+			}
+		}
+
+		// Parse account_id
+		if val, ok := row["account_id"].(float64); ok {
+			transcript.AccountID = int(val)
+		} else if val, ok := row["account_id"].(int64); ok {
+			transcript.AccountID = int(val)
+		} else if val, ok := row["account_id"].(int); ok {
+			transcript.AccountID = val
+		}
+
+		// Parse org_id
+		if val, ok := row["org_id"].(float64); ok {
+			transcript.OrgID = int(val)
+		} else if val, ok := row["org_id"].(int64); ok {
+			transcript.OrgID = int(val)
+		} else if val, ok := row["org_id"].(int); ok {
+			transcript.OrgID = val
+		}
+
+		// Parse user_id
+		if val, ok := row["user_id"].(float64); ok {
+			transcript.UserID = int(val)
+		} else if val, ok := row["user_id"].(int64); ok {
+			transcript.UserID = int(val)
+		} else if val, ok := row["user_id"].(int); ok {
+			transcript.UserID = val
+		}
+
+		// Parse string fields
+		transcript.Org = getStringValue(row, "org")
+		transcript.User = getStringValue(row, "user")
+		transcript.Hostname = getStringValue(row, "hostname")
+
+		// Store all other fields in the Fields map
+		for key, value := range row {
+			// Skip fields we've already parsed
+			if key != "_time" && key != "time" && key != "account_id" && key != "org_id" && key != "user_id" && key != "org" && key != "user" && key != "hostname" {
+				transcript.Fields[key] = value
+			}
+		}
+
+		records = append(records, transcript)
+	}
+
+	return records, nil
 }
