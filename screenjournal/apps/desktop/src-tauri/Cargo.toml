@@ -41,7 +41,7 @@ aw-models = { git = "https://github.com/ActivityWatch/aw-server-rust.git", branc
 chrono = { version = "0.4", features = ["serde"] }
 
 # Screen recording dependencies
-scap = "0.0.8"  # Cross-platform screen capture (pinned to stable version)
+scap = { git = "https://github.com/CapSoftware/scap.git", branch = "fix-windows" }  # Cross-platform screen capture with audio support
 regex = "1.10"
 walkdir = "2.4"
 hostname = "0.4"
@@ -59,9 +59,14 @@ sysinfo = "0.30"
 # Gemini AI integration dependencies
 base64 = "0.22"            # Video encoding for API upload
 
+# Audio capture and transcription dependencies
+cpal = "0.15"              # Cross-platform audio I/O
+whisper-rs = "0.12"        # Whisper speech-to-text (whisper.cpp bindings)
+hound = "3.5"              # WAV file reading/writing
+
 # Platform-specific dependencies
 [target.'cfg(windows)'.dependencies]
-windows-capture = ">=1.3.6, <1.5"  # Pinned for scap 0.0.8 compatibility (1.5+ breaks API)
+windows-capture = "^1.5"  # Required by scap git branch version
 
 # Note: libspa compatibility issue on Linux
 # The libspa 0.8.0 crate (via scap) has API mismatches with newer PipeWire headers

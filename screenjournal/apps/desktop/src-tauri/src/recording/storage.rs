@@ -19,6 +19,12 @@
  * │   └── ...
  * └── 2025-01-16/
  *     └── ...
+ * ~/.screenjournal/audio/
+ * ├── 2025-01-15/
+ * │   ├── segment_1736956800_abc123.mp4   # Mixed audio (AAC in MP4)
+ * │   └── ...
+ * └── 2025-01-16/
+ *     └── ...
  * 
  * ============================================================================
  */
@@ -35,6 +41,32 @@ pub fn get_recordings_dir(app: &AppHandle) -> PathBuf {
         .app_data_dir()
         .expect("app_data_dir available")
         .join("recordings")
+}
+
+// Get the base audio directory (separate from recordings)
+pub fn get_audio_dir(app: &AppHandle) -> PathBuf {
+    app.path()
+        .app_data_dir()
+        .expect("app_data_dir available")
+        .join("audio")
+}
+
+// Get the path for a mixed audio file (MP4 format)
+pub fn get_audio_path(app: &AppHandle, date: &NaiveDate, segment_id: &str) -> PathBuf {
+    let base_dir = get_audio_dir(app);
+    let date_dir = base_dir.join(date.format("%Y-%m-%d").to_string());
+    date_dir.join(format!("{}.mp4", segment_id))
+}
+
+// Ensure the audio directory exists for a date
+pub fn ensure_audio_dir(app: &AppHandle, date: &NaiveDate) -> Result<PathBuf, String> {
+    let base_dir = get_audio_dir(app);
+    let date_dir = base_dir.join(date.format("%Y-%m-%d").to_string());
+    
+    std::fs::create_dir_all(&date_dir)
+        .map_err(|e| format!("Failed to create audio directory: {}", e))?;
+    
+    Ok(date_dir)
 }
 
 // Get the path for an MP4 recording segment file for a specific display

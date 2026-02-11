@@ -37,6 +37,14 @@ import {
   DEFAULT_GEMINI_CONFIG,
   type GeminiConfig,
   type GeminiQueueStatus,
+  // Audio feature and transcription imports
+  getAudioFeatureConfig,
+  updateAudioFeatureConfig,
+  isWhisperAvailable,
+  getTranscriptionQueueStatus,
+  DEFAULT_AUDIO_FEATURE_CONFIG,
+  type AudioFeatureConfig,
+  type TranscriptionQueueStatus,
 } from "@/lib/recordingClient";
 import {
   CollectorConfig,
@@ -48,7 +56,7 @@ import {
 } from "@/lib/collectorClient";
 import { getAccessToken } from "@/lib/localAuth";
 import { Button } from "@repo/ui";
-import { Video, Settings2, HardDrive, Gauge, Cloud, CheckCircle, AlertCircle, Network, X, Loader, Monitor, Sparkles } from "lucide-react";
+import { Video, Settings2, HardDrive, Gauge, Cloud, CheckCircle, AlertCircle, Network, X, Loader, Monitor, Sparkles, Mic, ChevronDown, ChevronRight } from "lucide-react";
 import { message } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
@@ -110,6 +118,13 @@ export function Settings() {
   const [geminiApiKeyInput, setGeminiApiKeyInput] = useState<string>("");
   const [showApiKey, setShowApiKey] = useState(false);
 
+  // Audio feature and transcription state
+  const [audioConfig, setAudioConfig] = useState<AudioFeatureConfig>(DEFAULT_AUDIO_FEATURE_CONFIG);
+  const [audioConfigLoading, setAudioConfigLoading] = useState(true);
+  const [showAudioAdvanced, setShowAudioAdvanced] = useState(false);
+  const [whisperAvailable, setWhisperAvailable] = useState(false);
+  const [transcriptionQueueStatus, setTranscriptionQueueStatus] = useState<TranscriptionQueueStatus | null>(null);
+
 
   /**
    * Load all configuration on component mount
@@ -121,6 +136,8 @@ export function Settings() {
     loadStatus();
     loadDisplayCount();
     loadGeminiSettings();
+    loadAudioConfig();
+    loadTranscriptionStatus();
     
     // Update collector with current token if available
     const updateCollectorToken = async () => {
@@ -278,6 +295,37 @@ export function Settings() {
   };
   
   /**
+   * Load audio feature configuration
+   */
+  const loadAudioConfig = async () => {
+    setAudioConfigLoading(true);
+    try {
+      const [cfg, available] = await Promise.all([
+        getAudioFeatureConfig(),
+        isWhisperAvailable(),
+      ]);
+      setAudioConfig(cfg);
+      setWhisperAvailable(available);
+    } catch (error) {
+      console.error("Failed to load audio config:", error);
+    } finally {
+      setAudioConfigLoading(false);
+    }
+  };
+
+  /**
+   * Load transcription queue status
+   */
+  const loadTranscriptionStatus = async () => {
+    try {
+      const status = await getTranscriptionQueueStatus();
+      setTranscriptionQueueStatus(status);
+    } catch (error) {
+      console.error("Failed to load transcription queue status:", error);
+    }
+  };
+
+  /**
    * Delete Gemini API key
    */
   const handleDeleteGeminiApiKey = async () => {
@@ -420,7 +468,15 @@ export function Settings() {
       }
     }
 
-    // 3. Validate and save collector settings
+    // 3. Save audio feature config
+    try {
+      await updateAudioFeatureConfig(audioConfig);
+      await loadTranscriptionStatus();
+    } catch (error: any) {
+      errors.push(`Audio recording config: ${error?.message || error}`);
+    }
+
+    // 4. Validate and save collector settings
     // Always enforce protected field values before validation
     const appJwtToken = getAccessToken();
     const configToSave = {
@@ -809,6 +865,192 @@ export function Settings() {
               <p className="text-sm text-gray-600 mt-1">
                 Oldest recordings will be deleted when storage limit is reached
               </p>
+            </div>
+
+            {/* Audio Recording Section */}
+            {audioConfigLoading ? (
+              <div className="text-center py-8">
+                <Loader className="w-6 h-6 animate-spin mx-auto mb-2 text-gray-400" />
+                <p className="text-gray-600">Loading audio settings...</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg border overflow-hidden">
+                <div className="flex items-center justify-between p-4 border-b bg-gray-50">
+                  <div className="flex items-center gap-3">
+                    <Mic className="w-5 h-5 text-purple-600" />
+                    <div>
+                      <h3 className="font-semibold">Audio Recording</h3>
+                      <p className="text-sm text-gray-600">Records microphone and system audio</p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={audioConfig.enabled}
+                    onChange={(e) => setAudioConfig({ ...audioConfig, enabled: e.target.checked })}
+                    className="w-5 h-5"
+                  />
+                </div>
+
+                {audioConfig.enabled && (
+                  <div className="p-4 space-y-4">
+                    {/* Info about audio-only mode */}
+                    {!config?.enabled && (
+                      <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+                        <p className="text-sm text-blue-800">
+                          Audio-only mode: System audio is captured using minimal background processing.
+                          Enable screen recording to also capture meeting/call audio with video.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Whisper Status */}
+                    {whisperAvailable ? (
+                      <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <span className="text-green-800 font-medium">Whisper model loaded</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <AlertCircle className="w-5 h-5 text-yellow-600" />
+                        <span className="text-yellow-800 font-medium">Whisper model not available - transcription disabled</span>
+                      </div>
+                    )}
+
+                    {/* Transcription Toggle */}
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <label className="font-medium">Enable Transcription</label>
+                        <p className="text-sm text-gray-600">Convert audio to text using Whisper</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={audioConfig.transcription_enabled}
+                        onChange={(e) => setAudioConfig({ ...audioConfig, transcription_enabled: e.target.checked })}
+                        disabled={!whisperAvailable}
+                        className="w-5 h-5"
+                      />
+                    </div>
+
+                    {/* Advanced Settings Toggle */}
+                    <button
+                      onClick={() => setShowAudioAdvanced(!showAudioAdvanced)}
+                      className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800"
+                    >
+                      {showAudioAdvanced ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      Advanced Settings
+                    </button>
+
+                    {showAudioAdvanced && (
+                      <div className="space-y-4 pl-4 border-l-2 border-gray-200">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Whisper Model</label>
+                          <select
+                            value={audioConfig.transcription_model}
+                            onChange={(e) => setAudioConfig({ ...audioConfig, transcription_model: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg"
+                          >
+                            <option value="tiny.en">tiny.en (fastest)</option>
+                            <option value="base.en">base.en (better accuracy)</option>
+                          </select>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Max Retries</label>
+                            <input
+                              type="number"
+                              value={audioConfig.transcription_max_retries}
+                              onChange={(e) => setAudioConfig({
+                                ...audioConfig,
+                                transcription_max_retries: Math.min(10, Math.max(1, parseInt(e.target.value) || 3)),
+                              })}
+                              min={1}
+                              max={10}
+                              className="w-full px-3 py-2 border rounded-lg"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Retry Delay (s)</label>
+                            <input
+                              type="number"
+                              value={audioConfig.transcription_retry_delay_seconds}
+                              onChange={(e) => setAudioConfig({
+                                ...audioConfig,
+                                transcription_retry_delay_seconds: Math.max(1, parseInt(e.target.value) || 5),
+                              })}
+                              min={1}
+                              className="w-full px-3 py-2 border rounded-lg"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Queue Status */}
+            <div className="bg-white rounded-lg p-4 border">
+              <h3 className="font-semibold mb-3">Processing Queue Status</h3>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Gemini Queue */}
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <h4 className="font-medium text-sm mb-2">Gemini Analysis</h4>
+                  {geminiQueueStatus ? (
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-gray-500">Pending:</span>
+                        <span className="ml-1 font-medium">{geminiQueueStatus.stats.jobs_pending}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Completed:</span>
+                        <span className="ml-1 font-medium text-green-600">{geminiQueueStatus.stats.jobs_completed}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Failed:</span>
+                        <span className="ml-1 font-medium text-red-600">{geminiQueueStatus.stats.jobs_failed}</span>
+                      </div>
+                      <div>
+                        <span className={`${geminiQueueStatus.running ? 'text-green-600' : 'text-gray-500'}`}>
+                          {geminiQueueStatus.running ? 'Running' : 'Stopped'}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">Loading...</p>
+                  )}
+                </div>
+
+                {/* Transcription Queue */}
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <h4 className="font-medium text-sm mb-2">Transcription</h4>
+                  {transcriptionQueueStatus ? (
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-gray-500">Pending:</span>
+                        <span className="ml-1 font-medium">{transcriptionQueueStatus.stats.jobs_pending}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Completed:</span>
+                        <span className="ml-1 font-medium text-green-600">{transcriptionQueueStatus.stats.jobs_completed}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Failed:</span>
+                        <span className="ml-1 font-medium text-red-600">{transcriptionQueueStatus.stats.jobs_failed}</span>
+                      </div>
+                      <div>
+                        <span className={`${transcriptionQueueStatus.running ? 'text-green-600' : 'text-gray-500'}`}>
+                          {transcriptionQueueStatus.running ? 'Running' : 'Stopped'}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">Loading...</p>
+                  )}
+                </div>
+              </div>
             </div>
           </>
         )}

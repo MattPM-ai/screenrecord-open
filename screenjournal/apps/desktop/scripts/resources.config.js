@@ -153,6 +153,34 @@ const resources = {
     // Verification command (run ffmpeg -version)
     verifyCommand: (binaryPath) => `"${binaryPath}" -version`,
   },
+  
+  /**
+   * Whisper Model - Speech-to-text transcription model
+   * Single file that works on all platforms
+   * https://huggingface.co/ggerganov/whisper.cpp
+   */
+  whisper: {
+    name: 'Whisper Model',
+    version: '1.5.4',
+    resourceDir: '.', // Goes directly in resources/ directory
+    skipEnvVar: 'SKIP_WHISPER_CHECK',
+    
+    // Single file, no platform-specific config needed
+    isSingleFile: true,
+    fileName: 'whisper-tiny.en.bin',
+    
+    // Direct download URL from Hugging Face
+    // Note: Hugging Face serves it as ggml-tiny.en.bin, but we rename it to whisper-tiny.en.bin
+    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin',
+    downloadedFileName: 'ggml-tiny.en.bin', // Actual filename from download
+    
+    // No extraction needed - it's a direct binary download
+    archiveType: null,
+    
+    // Verification: just check file exists and has reasonable size (~75MB)
+    verifyCommand: null,
+    minFileSize: 70 * 1024 * 1024, // ~70MB minimum
+  },
 };
 
 // =============================================================================

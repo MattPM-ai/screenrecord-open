@@ -41,6 +41,11 @@ pub fn run() {
             crate::recording::manager::set_gemini_api_key,
             crate::recording::manager::get_gemini_api_key_status,
             crate::recording::manager::delete_gemini_api_key,
+            // Audio feature and transcription commands
+            crate::recording::manager::get_audio_feature_config,
+            crate::recording::manager::update_audio_feature_config,
+            crate::recording::manager::is_whisper_available,
+            crate::recording::manager::get_transcription_queue_status,
             // Collector commands
             crate::collector::manager::start_collector,
             crate::collector::manager::stop_collector,
@@ -82,10 +87,47 @@ pub fn run() {
                 .unwrap_or_default();
             crate::recording::manager::init_config(recording_config);
             
-            // 3. Initialize Gemini queue
+            // 3. Initialize audio feature config
+            if let Err(e) = crate::recording::manager::init_audio_config(&app.handle()) {
+                log::warn!("Failed to initialize audio feature config: {}", e);
+            }
+            
+            // 4. Initialize Gemini queue
             let gemini_config = crate::recording::config::load_gemini_config(&app.handle())
                 .unwrap_or_default();
             crate::recording::gemini::init_queue(&app.handle(), gemini_config);
+            
+            // 5. Initialize Whisper model for transcription
+            if let Some(whisper_model_path) =
+                crate::recording::transcription::whisper::resolve_whisper_model_path(&app.handle())
+            {
+                if let Err(e) =
+                    crate::recording::transcription::whisper::init_whisper(&whisper_model_path)
+                {
+                    log::warn!(
+                        "Failed to initialize Whisper model: {} - transcription will be disabled",
+                        e
+                    );
+                } else {
+                    log::info!("Whisper model initialized successfully");
+                }
+            } else {
+                log::warn!(
+                    "Whisper model not found - transcription will be disabled"
+                );
+            }
+            
+            // 6. Initialize transcription queue with settings from audio config
+            let audio_config = crate::recording::config::load_audio_feature_config(&app.handle())
+                .unwrap_or_default();
+            let transcription_config = crate::recording::transcription::TranscriptionConfig {
+                enabled: audio_config.transcription_enabled,
+                model: audio_config.transcription_model,
+                max_retries: audio_config.transcription_max_retries,
+                retry_delay_seconds: audio_config.transcription_retry_delay_seconds,
+                processing_delay_seconds: audio_config.transcription_processing_delay_seconds,
+            };
+            crate::recording::transcription::init_queue(&app.handle(), transcription_config);
             
             // Start all backend services on app launch
             let app_handle = app.handle().clone();

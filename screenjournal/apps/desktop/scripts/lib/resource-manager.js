@@ -54,6 +54,11 @@ async function setupResource(resourceName, options = {}) {
     console.log(`\n🚀 Setting up ${resource.name}...`);
   }
   
+  // Handle single-file resources (like Whisper model)
+  if (resource.isSingleFile) {
+    return await setupSingleFileResource(resourceName, { force, verbose });
+  }
+  
   // Determine which platforms to setup
   let platformList;
   if (platforms === 'current') {
@@ -92,6 +97,97 @@ async function setupResource(resourceName, options = {}) {
   
   const allSuccess = Object.values(results).every(r => r.success);
   return { success: allSuccess, platforms: results };
+}
+
+/**
+ * Setup a single-file resource (not platform-specific)
+ * @private
+ */
+async function setupSingleFileResource(resourceName, options = {}) {
+  const { force = false, verbose = true } = options;
+  
+  const resource = getResource(resourceName);
+  if (!resource || !resource.isSingleFile) {
+    throw new Error(`Resource ${resourceName} is not a single-file resource`);
+  }
+  
+  // Target is directly in resources/ directory
+  const targetDir = path.join(PATHS.resourcesDir, resource.resourceDir === '.' ? '' : resource.resourceDir);
+  const targetPath = path.join(targetDir, resource.fileName);
+  
+  if (verbose) {
+    console.log(`  📍 Target: ${targetPath}`);
+  }
+  
+  // Check if already installed
+  if (!force && fileExists(targetPath)) {
+    // Verify file size if specified
+    if (resource.minFileSize) {
+      const stats = fs.statSync(targetPath);
+      if (stats.size >= resource.minFileSize) {
+        if (verbose) {
+          console.log(`    ✅ Already installed (${(stats.size / 1024 / 1024).toFixed(1)} MB)`);
+        }
+        return { success: true, skipped: true };
+      } else {
+        if (verbose) {
+          console.log(`    ⚠️  File exists but is too small, re-downloading...`);
+        }
+      }
+    } else {
+      if (verbose) {
+        console.log(`    ✅ Already installed`);
+      }
+      return { success: true, skipped: true };
+    }
+  }
+  
+  try {
+    // Ensure target directory exists
+    ensureDir(targetDir);
+    
+    // Ensure temp directory
+    ensureDir(PATHS.tempDir);
+    
+    // Download directly (no extraction needed)
+    // Use downloadedFileName if specified, otherwise use fileName
+    const downloadFileName = resource.downloadedFileName || resource.fileName;
+    const tempPath = path.join(PATHS.tempDir, downloadFileName);
+    await downloadFile(resource.url, tempPath, { showProgress: verbose });
+    
+    // Verify file size if specified
+    if (resource.minFileSize) {
+      const stats = fs.statSync(tempPath);
+      if (stats.size < resource.minFileSize) {
+        throw new Error(`Downloaded file is too small: ${stats.size} bytes (expected at least ${resource.minFileSize} bytes)`);
+      }
+      if (verbose) {
+        console.log(`    📊 File size: ${(stats.size / 1024 / 1024).toFixed(1)} MB`);
+      }
+    }
+    
+    // Copy to target location (rename if downloaded filename differs)
+    copyFile(tempPath, targetPath);
+    if (verbose && downloadFileName !== resource.fileName) {
+      console.log(`    📝 Renamed ${downloadFileName} → ${resource.fileName}`);
+    }
+    
+    if (verbose) {
+      console.log(`    ✅ Setup complete`);
+    }
+    
+    // Cleanup temp directory
+    removeDir(PATHS.tempDir);
+    
+    return { success: true };
+    
+  } catch (error) {
+    if (verbose) {
+      console.error(`    ❌ Failed: ${error.message}`);
+    }
+    removeDir(PATHS.tempDir);
+    return { success: false, error: error.message };
+  }
 }
 
 /**
@@ -260,6 +356,32 @@ function checkResource(resourceName, options = {}) {
     return { success: true, skipped: true, platforms: {} };
   }
   
+  // Handle single-file resources
+  if (resource.isSingleFile) {
+    const targetDir = path.join(PATHS.resourcesDir, resource.resourceDir === '.' ? '' : resource.resourceDir);
+    const targetPath = path.join(targetDir, resource.fileName);
+    
+    const exists = fileExists(targetPath);
+    let sizeOk = true;
+    
+    if (exists && resource.minFileSize) {
+      const stats = fs.statSync(targetPath);
+      sizeOk = stats.size >= resource.minFileSize;
+    }
+    
+    return {
+      success: exists && sizeOk,
+      platforms: {
+        'all': {
+          exists,
+          path: targetPath,
+          verified: sizeOk,
+          size: exists ? fs.statSync(targetPath).size : null,
+        }
+      }
+    };
+  }
+  
   // Determine which platforms to check
   let platformList;
   if (platforms === 'current') {
@@ -352,6 +474,36 @@ function bundleResource(resourceName, bundlePath, options = {}) {
     return { success: false, error: `Unknown resource: ${resourceName}` };
   }
   
+  // Handle single-file resources
+  if (resource.isSingleFile) {
+    const sourcePath = path.join(PATHS.resourcesDir, resource.resourceDir === '.' ? '' : resource.resourceDir, resource.fileName);
+    const targetDir = path.join(bundlePath, resource.resourceDir === '.' ? '' : resource.resourceDir);
+    const targetPath = path.join(targetDir, resource.fileName);
+    
+    // Check if source exists
+    if (!fileExists(sourcePath)) {
+      return { success: false, error: `Resource not found: ${sourcePath}` };
+    }
+    
+    // Ensure target directory exists
+    ensureDir(targetDir);
+    
+    // Remove existing file if it exists
+    if (fileExists(targetPath)) {
+      fs.unlinkSync(targetPath);
+    }
+    
+    // Copy file
+    try {
+      copyFile(sourcePath, targetPath);
+    } catch (error) {
+      return { success: false, error: `Copy failed: ${error.message}` };
+    }
+    
+    return { success: true };
+  }
+  
+  // Handle directory-based resources (platform-specific)
   const sourcePath = path.join(PATHS.resourcesDir, resource.resourceDir);
   const targetPath = path.join(bundlePath, resource.resourceDir);
   

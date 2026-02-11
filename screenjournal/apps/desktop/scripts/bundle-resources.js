@@ -102,6 +102,8 @@ function main() {
         console.error(`     Run: npm run setup-aw\n`);
       } else if (resourceName === 'ffmpeg') {
         console.error(`     Run: npm run setup-ffmpeg\n`);
+      } else if (resourceName === 'whisper') {
+        console.error(`     Run: npm run setup-whisper\n`);
       }
     }
   }

@@ -4,6 +4,7 @@
 ```bash
 npm run setup-aw       # Download ActivityWatch binaries (only needed once)
 npm run setup-ffmpeg   # Download ffmpeg binaries (only needed once)
+npm run setup-whisper  # Download Whisper model for transcription (only needed once)
 npm run tauri:dev      # Start development
 ```
 
@@ -32,6 +33,7 @@ Run the automated setup script to download and install ActivityWatch binaries fo
 ```bash
 npm run setup-aw
 npm run setup-ffmpeg
+npm run setup-whisper
 ```
 
 This will automatically:

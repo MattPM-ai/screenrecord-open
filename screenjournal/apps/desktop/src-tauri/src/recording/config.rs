@@ -14,7 +14,7 @@
  */
 
 use crate::recording::gemini::GeminiConfig;
-use crate::recording::types::RecordingConfig;
+use crate::recording::types::{RecordingConfig, AudioFeatureConfig};
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
@@ -200,6 +200,59 @@ pub fn delete_gemini_api_key(app: &AppHandle) -> Result<(), String> {
         log::info!("Deleted Gemini API key from secure storage");
     }
     
+    Ok(())
+}
+
+// =============================================================================
+// Audio Feature Configuration
+// =============================================================================
+
+// Get audio feature config file path
+fn audio_feature_config_path(app: &AppHandle) -> PathBuf {
+    app.path()
+        .app_data_dir()
+        .expect("app_data_dir available")
+        .join("audio_feature_config.json")
+}
+
+// Load audio feature configuration from disk
+/// 
+/// Returns default configuration if file doesn't exist.
+pub fn load_audio_feature_config(app: &AppHandle) -> Result<AudioFeatureConfig, String> {
+    let path = audio_feature_config_path(app);
+    
+    if !path.exists() {
+        log::info!("No audio feature config found, using defaults");
+        return Ok(AudioFeatureConfig::default());
+    }
+    
+    let contents = std::fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read audio feature config: {}", e))?;
+    
+    let config: AudioFeatureConfig = serde_json::from_str(&contents)
+        .map_err(|e| format!("Failed to parse audio feature config: {}", e))?;
+    
+    log::info!("Loaded audio feature config from {:?}", path);
+    Ok(config)
+}
+
+// Save audio feature configuration to disk
+pub fn save_audio_feature_config(app: &AppHandle, config: &AudioFeatureConfig) -> Result<(), String> {
+    let path = audio_feature_config_path(app);
+    
+    // Ensure directory exists
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create config dir: {}", e))?;
+    }
+    
+    let contents = serde_json::to_string_pretty(config)
+        .map_err(|e| format!("Failed to serialize audio feature config: {}", e))?;
+    
+    std::fs::write(&path, contents)
+        .map_err(|e| format!("Failed to write audio feature config: {}", e))?;
+    
+    log::info!("Saved audio feature config to {:?}", path);
     Ok(())
 }
 

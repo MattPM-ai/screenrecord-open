@@ -22,6 +22,71 @@ use serde::{Deserialize, Serialize};
 // Re-export GeminiConfig for convenience
 pub use crate::recording::gemini::types::GeminiConfig;
 
+// =============================================================================
+// Audio Feature Configuration
+// =============================================================================
+
+/**
+ * Audio Feature Configuration
+ * 
+ * Controls audio recording (microphone + system audio) and Whisper transcription.
+ */
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AudioFeatureConfig {
+    /// Enable audio recording (mic + system audio)
+    pub enabled: bool,
+    
+    /// Enable Whisper transcription (separate from recording)
+    #[serde(default = "default_transcription_enabled")]
+    pub transcription_enabled: bool,
+    
+    /// Whisper model to use (e.g., "tiny.en", "base.en")
+    #[serde(default = "default_transcription_model")]
+    pub transcription_model: String,
+    
+    /// Maximum retry attempts for failed transcription jobs
+    #[serde(default = "default_transcription_max_retries")]
+    pub transcription_max_retries: u32,
+    
+    /// Base delay between transcription retries (seconds)
+    #[serde(default = "default_transcription_retry_delay")]
+    pub transcription_retry_delay_seconds: u64,
+    
+    /// Delay before starting transcription after segment finishes (seconds)
+    #[serde(default = "default_transcription_processing_delay")]
+    pub transcription_processing_delay_seconds: u64,
+}
+
+fn default_transcription_enabled() -> bool { true }
+fn default_transcription_model() -> String { "tiny.en".to_string() }
+fn default_transcription_max_retries() -> u32 { 3 }
+fn default_transcription_retry_delay() -> u64 { 5 }
+fn default_transcription_processing_delay() -> u64 { 5 }
+
+impl Default for AudioFeatureConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true, // Audio recording enabled by default
+            transcription_enabled: default_transcription_enabled(),
+            transcription_model: default_transcription_model(),
+            transcription_max_retries: default_transcription_max_retries(),
+            transcription_retry_delay_seconds: default_transcription_retry_delay(),
+            transcription_processing_delay_seconds: default_transcription_processing_delay(),
+        }
+    }
+}
+
+impl AudioFeatureConfig {
+    /// Check if config changes require recording system restart
+    pub fn needs_recording_restart(&self, other: &AudioFeatureConfig) -> bool {
+        self.enabled != other.enabled
+    }
+}
+
+// =============================================================================
+// Screen Recording Configuration
+// =============================================================================
+
 // Configuration for screen recording capture
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RecordingConfig {

@@ -38,5 +38,8 @@ pub mod capture;
 pub mod config;
 pub mod gemini;
 pub mod manager;
+pub mod microphone;
 pub mod storage;
+pub mod transcription;
 pub mod types;
+pub mod upload;

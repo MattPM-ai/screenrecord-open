@@ -289,3 +289,94 @@ export async function updateGeminiConfig(config: GeminiConfig): Promise<void> {
 export async function getGeminiQueueStatus(): Promise<GeminiQueueStatus> {
   return await invoke('get_gemini_queue_status');
 }
+
+// =============================================================================
+// AUDIO FEATURE CONFIGURATION
+// =============================================================================
+
+/**
+ * Configuration for audio recording and transcription
+ */
+export type AudioFeatureConfig = {
+  enabled: boolean;
+  transcription_enabled: boolean;
+  transcription_model: string;
+  transcription_max_retries: number;
+  transcription_retry_delay_seconds: number;
+  transcription_processing_delay_seconds: number;
+};
+
+/**
+ * Default audio feature configuration
+ */
+export const DEFAULT_AUDIO_FEATURE_CONFIG: AudioFeatureConfig = {
+  enabled: true,
+  transcription_enabled: true,
+  transcription_model: "tiny.en",
+  transcription_max_retries: 3,
+  transcription_retry_delay_seconds: 5,
+  transcription_processing_delay_seconds: 5,
+};
+
+/**
+ * Get audio feature configuration
+ */
+export async function getAudioFeatureConfig(): Promise<AudioFeatureConfig> {
+  return await invoke('get_audio_feature_config');
+}
+
+/**
+ * Update audio feature configuration
+ */
+export async function updateAudioFeatureConfig(
+  config: AudioFeatureConfig
+): Promise<void> {
+  return await invoke('update_audio_feature_config', { newConfig: config });
+}
+
+// =============================================================================
+// TRANSCRIPTION
+// =============================================================================
+
+/**
+ * Queue statistics for transcription processing
+ */
+export type TranscriptionQueueStats = {
+  jobs_submitted: number;
+  jobs_completed: number;
+  jobs_failed: number;
+  jobs_pending: number;
+  last_error: string | null;
+  total_audio_processed_ms: number;
+  total_processing_time_ms: number;
+};
+
+/**
+ * Transcription queue status
+ */
+export type TranscriptionQueueStatus = {
+  running: boolean;
+  whisper_available: boolean;
+  stats: TranscriptionQueueStats;
+  config: {
+    enabled: boolean;
+    model: string;
+    max_retries: number;
+    retry_delay_seconds: number;
+    processing_delay_seconds: number;
+  };
+};
+
+/**
+ * Check if Whisper is available
+ */
+export async function isWhisperAvailable(): Promise<boolean> {
+  return await invoke('is_whisper_available');
+}
+
+/**
+ * Get transcription queue status
+ */
+export async function getTranscriptionQueueStatus(): Promise<TranscriptionQueueStatus> {
+  return await invoke('get_transcription_queue_status');
+}

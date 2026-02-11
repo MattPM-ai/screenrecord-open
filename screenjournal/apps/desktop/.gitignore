@@ -41,6 +41,11 @@ src-tauri/resources/ffmpeg/linux/x86_64/*
 src-tauri/resources/ffmpeg/windows/x86_64/*
 !src-tauri/resources/ffmpeg/windows/x86_64/.gitkeep
 
+# Whisper model - ignore downloaded model file
+# This is a large model file (~75MB) that should be downloaded via `npm run setup-whisper`
+# Not committed to avoid repo bloat
+src-tauri/resources/whisper-tiny.en.bin
+
 # Database binaries - ignore bundled database binaries but keep directory structure
 # These are large platform-specific binaries generated during build via `./build-bundled.sh`
 # Not committed to avoid repo bloat (~150-300MB per platform)

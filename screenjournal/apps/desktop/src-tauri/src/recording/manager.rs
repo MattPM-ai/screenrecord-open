@@ -20,7 +20,8 @@
  * ============================================================================
  */
 
-use crate::recording::{capture, config, gemini, storage, types::*};
+use crate::recording::{capture, config, gemini, storage, transcription, types::*, upload};
+use crate::recording::capture::{AudioCaptureRole, SharedAudioPaths};
 use chrono::Utc;
 use once_cell::sync::Lazy;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -31,6 +32,10 @@ use tauri::AppHandle;
 // Global recording configuration
 static RECORDING_CONFIG: Lazy<Mutex<RecordingConfig>> =
     Lazy::new(|| Mutex::new(RecordingConfig::default()));
+
+// Global audio feature configuration
+static AUDIO_FEATURE_CONFIG: Lazy<Mutex<AudioFeatureConfig>> =
+    Lazy::new(|| Mutex::new(AudioFeatureConfig::default()));
 
 // Global recording state
 static RECORDING_STATE: Lazy<Mutex<RecordingStateHolder>> =
@@ -82,6 +87,18 @@ impl std::fmt::Debug for RecordingStateHolder {
 // Initialize configuration on app startup
 pub fn init_config(config: RecordingConfig) {
     *RECORDING_CONFIG.lock().unwrap() = config;
+}
+
+// Initialize audio feature configuration on app startup
+pub fn init_audio_config(app: &AppHandle) -> Result<(), String> {
+    let audio_config = config::load_audio_feature_config(app)?;
+    *AUDIO_FEATURE_CONFIG.lock().unwrap() = audio_config;
+    
+    // Initialize transcription queue with loaded config
+    let config_clone = AUDIO_FEATURE_CONFIG.lock().unwrap().clone();
+    transcription::update_config_from_audio_feature(&config_clone);
+    
+    Ok(())
 }
 
 // Start screen recording
@@ -172,6 +189,26 @@ fn start_new_segment(app: &AppHandle, config: &RecordingConfig) -> Result<(), St
     // Primary timing is controlled by rotation loop's shutdown signal
     let safety_timeout = Duration::from_secs(config.segment_duration_seconds + 120);
     
+    // Audio capture setup: Primary display (0) captures audio, others use shared audio
+    let primary_display_index: u32 = 0;
+    let audio_ready_signal = Arc::new(AtomicBool::new(false));
+    let audio_failed_signal = Arc::new(AtomicBool::new(false));
+    
+    // Paths for shared audio files (from primary display)
+    // These match the format expected by transcription::storage::get_audio_path
+    let shared_audio_paths = SharedAudioPaths {
+        system_audio_path: transcription::storage::get_audio_path(
+            app, &date, &segment_id, primary_display_index, transcription::AudioSource::SystemAudio
+        ),
+        mic_audio_path: transcription::storage::get_audio_path(
+            app, &date, &segment_id, primary_display_index, transcription::AudioSource::Microphone
+        ),
+    };
+    
+    // Get audio feature config
+    let audio_config = AUDIO_FEATURE_CONFIG.lock().unwrap().clone();
+    let capture_audio = audio_config.enabled;
+    
     let mut capture_threads = Vec::new();
     
     for display_idx in 0..display_count {
@@ -181,6 +218,20 @@ fn start_new_segment(app: &AppHandle, config: &RecordingConfig) -> Result<(), St
         let shutdown_clone = shutdown.clone();
         let display_index = display_idx as u32;
         let preset_clone = preset.clone();
+        
+        // Determine audio role for this display
+        let audio_role: AudioCaptureRole = if display_index == primary_display_index {
+            AudioCaptureRole::Primary {
+                audio_ready_signal: audio_ready_signal.clone(),
+                audio_failed_signal: audio_failed_signal.clone(),
+            }
+        } else {
+            AudioCaptureRole::Secondary {
+                shared_audio: shared_audio_paths.clone(),
+                audio_ready_signal: audio_ready_signal.clone(),
+                audio_failed_signal: audio_failed_signal.clone(),
+            }
+        };
         
         let handle = std::thread::spawn(move || {
             capture::capture_display_to_file(
@@ -192,6 +243,8 @@ fn start_new_segment(app: &AppHandle, config: &RecordingConfig) -> Result<(), St
                 &output_path,
                 safety_timeout,
                 shutdown_clone,
+                audio_role,
+                capture_audio,
             )
         });
         
@@ -331,6 +384,79 @@ fn finalize_current_segment(app: &AppHandle) -> Result<Option<RecordingMetadata>
         
         if let Err(e) = gemini::submit_job(job) {
             log::warn!("Failed to queue Gemini analysis job: {}", e);
+        }
+    }
+    
+    // Audio mixing and transcription (if audio files exist)
+    // Note: Audio capture integration into capture.rs is still pending
+    // This code will work once audio files are created by the capture module
+    let primary_display_index: u32 = 0;
+    
+    // Get audio file paths (these may not exist yet if audio capture isn't integrated)
+    let mic_path = transcription::storage::get_audio_path(
+        app, &date, &metadata.id, primary_display_index, transcription::AudioSource::Microphone
+    );
+    let system_audio_path = transcription::storage::get_audio_path(
+        app, &date, &metadata.id, primary_display_index, transcription::AudioSource::SystemAudio
+    );
+    
+    // Mix and save audio locally (if audio files exist)
+    let upload_config = upload::UploadConfig::default();
+    let audio_output_path = storage::get_audio_path(app, &date, &metadata.id);
+    
+    // Ensure audio directory exists
+    storage::ensure_audio_dir(app, &date).ok();
+    
+    let audio_path_result = upload::mix_and_save_audio(
+        &metadata.id,
+        &system_audio_path,
+        if mic_path.exists() { Some(mic_path.as_path()) } else { None },
+        &audio_output_path,
+        &upload_config,
+    );
+    
+    // Submit transcription jobs if audio files exist and transcription is enabled
+    // Note: This requires AudioFeatureConfig to be added to manager state
+    // For now, we'll check if transcription queue is initialized
+    let transcription_enabled = {
+        // Check if transcription queue is running (indicates it's enabled)
+        let status = transcription::get_queue_status();
+        status.running && status.config.enabled
+    };
+    
+    if transcription_enabled {
+        // Submit microphone transcription job
+        if mic_path.exists() {
+            let job = transcription::TranscriptionJob {
+                segment_id: metadata.id.clone(),
+                display_index: primary_display_index,
+                source: transcription::AudioSource::Microphone,
+                audio_path: mic_path,
+                segment_start_time: metadata.start_time.clone(),
+                retry_count: 0,
+                created_at: chrono::Utc::now(),
+                audio_path_local: audio_path_result.clone(),
+            };
+            if let Err(e) = transcription::submit_job(job) {
+                log::warn!("Failed to queue mic transcription job: {}", e);
+            }
+        }
+        
+        // Submit system audio transcription job
+        if system_audio_path.exists() {
+            let job = transcription::TranscriptionJob {
+                segment_id: metadata.id.clone(),
+                display_index: primary_display_index,
+                source: transcription::AudioSource::SystemAudio,
+                audio_path: system_audio_path,
+                segment_start_time: metadata.start_time.clone(),
+                retry_count: 0,
+                created_at: chrono::Utc::now(),
+                audio_path_local: audio_path_result.clone(),
+            };
+            if let Err(e) = transcription::submit_job(job) {
+                log::warn!("Failed to queue system audio transcription job: {}", e);
+            }
         }
     }
     
@@ -621,4 +747,73 @@ pub async fn delete_gemini_api_key(
     config::delete_gemini_api_key(&app)?;
     log::info!("Gemini API key deleted from secure storage");
     Ok(())
+}
+
+// =============================================================================
+// Audio Feature Config Commands
+// =============================================================================
+
+/// Get audio feature configuration
+#[tauri::command]
+pub async fn get_audio_feature_config() -> Result<AudioFeatureConfig, String> {
+    Ok(AUDIO_FEATURE_CONFIG.lock().unwrap().clone())
+}
+
+/// Update audio feature configuration
+#[tauri::command]
+pub async fn update_audio_feature_config(
+    app: AppHandle,
+    new_config: AudioFeatureConfig,
+) -> Result<(), String> {
+    let current_config = AUDIO_FEATURE_CONFIG.lock().unwrap().clone();
+    
+    if current_config == new_config {
+        log::info!("Audio feature configuration unchanged");
+        return Ok(());
+    }
+    
+    let needs_restart = current_config.needs_recording_restart(&new_config);
+    let is_recording = {
+        let state = RECORDING_STATE.lock().unwrap();
+        matches!(*state, RecordingStateHolder::Recording { .. })
+    };
+    
+    // Store new config
+    *AUDIO_FEATURE_CONFIG.lock().unwrap() = new_config.clone();
+    config::save_audio_feature_config(&app, &new_config)?;
+    
+    // Update transcription queue with new settings
+    transcription::update_config_from_audio_feature(&new_config);
+    
+    // Handle restart if needed
+    if is_recording && needs_restart {
+        log::info!("Audio feature config change requires restart");
+        stop_recording(app.clone()).await?;
+        
+        // Check if recording should restart (if enabled in new config)
+        if new_config.enabled {
+            let config = RECORDING_CONFIG.lock().unwrap().clone();
+            if config.enabled {
+                start_recording(app).await?;
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+// =============================================================================
+// Transcription Commands
+// =============================================================================
+
+/// Check if Whisper is available
+#[tauri::command]
+pub async fn is_whisper_available() -> Result<bool, String> {
+    Ok(transcription::whisper::is_available())
+}
+
+/// Get transcription queue status
+#[tauri::command]
+pub async fn get_transcription_queue_status() -> Result<transcription::QueueStatus, String> {
+    Ok(transcription::get_queue_status())
 }
