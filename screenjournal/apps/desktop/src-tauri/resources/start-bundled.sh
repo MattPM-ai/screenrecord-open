@@ -117,13 +117,10 @@ fi
 INFLUXDB_DATA_DIR="$APP_DATA_DIR/influxdb/data"
 mkdir -p "$INFLUXDB_DATA_DIR"
 
-# Check if InfluxDB needs setup
-# We'll check both the bolt file and the API endpoint
+# InfluxDB paths and default token (used by collector/report; may be updated after setup)
 BOLT_PATH="$INFLUXDB_DATA_DIR/influxdb.bolt"
 NEEDS_SETUP="false"
-if [ ! -f "$BOLT_PATH" ]; then
-    NEEDS_SETUP="true"
-fi
+RESOLVED_INFLUX_TOKEN="screenjournal-admin-token-change-in-production"
 
 # Start InfluxDB
 export INFLUXD_DATA_DIR="$INFLUXDB_DATA_DIR"
@@ -140,32 +137,30 @@ INFLUXDB_PID=$!
 if wait_for_service "InfluxDB" 8086 30 "http://localhost:8086/health"; then
     echo "${PROGRESS_PREFIX} influxdb:ready"
     
-    # Always check setup status via API (more reliable than just checking bolt file)
+    # Decide setup purely from API (source of truth; don't use bolt file)
     sleep 2  # Give InfluxDB a moment to fully initialize
     SETUP_STATUS=$(curl -s http://localhost:8086/api/v2/setup 2>&1)
     
-    # Check if setup is needed (allowed: true means setup is needed)
     if echo "$SETUP_STATUS" | grep -q "\"allowed\":true"; then
         echo "${STEP_PREFIX} InfluxDB needs setup (detected via API)"
         NEEDS_SETUP="true"
-    elif [ "$NEEDS_SETUP" = "true" ]; then
-        echo "${STEP_PREFIX} InfluxDB needs setup (no bolt file found)"
     else
         echo "${STEP_PREFIX} InfluxDB appears to be already set up"
     fi
+    
+    # Default token for collector and report (used if we don't run setup or response has no token)
+    RESOLVED_INFLUX_TOKEN="screenjournal-admin-token-change-in-production"
     
     # If setup is needed, use InfluxDB REST API to set it up
     if [ "$NEEDS_SETUP" = "true" ]; then
         echo "${STEP_PREFIX} Setting up InfluxDB (creating user, org, bucket)..."
         
-        # Setup credentials
         SETUP_USERNAME="admin"
         SETUP_PASSWORD="admin123"
         SETUP_ORG="screenjournal-org"
         SETUP_BUCKET="screenjournal-metrics"
         SETUP_TOKEN="screenjournal-admin-token-change-in-production"
         
-        # Call the setup API endpoint
         SETUP_RESPONSE=$(curl -s -X POST http://localhost:8086/api/v2/setup \
             -H "Content-Type: application/json" \
             -d "{
@@ -176,10 +171,14 @@ if wait_for_service "InfluxDB" 8086 30 "http://localhost:8086/health"; then
                 \"token\": \"$SETUP_TOKEN\"
             }" 2>&1)
         
-        # Check for success indicators
         if echo "$SETUP_RESPONSE" | grep -q "\"user\"" || echo "$SETUP_RESPONSE" | grep -q "\"auth\""; then
             echo "${SUCCESS_PREFIX} InfluxDB setup completed successfully"
-            # Verify setup by checking the setup endpoint again
+            # Use token from response if present (some InfluxDB versions return a new token)
+            EXTRACTED_TOKEN=$(echo "$SETUP_RESPONSE" | grep -oE '"token"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed -n 's/.*:[[:space:]]*"\([^"]*\)".*/\1/p')
+            if [ -n "$EXTRACTED_TOKEN" ]; then
+                RESOLVED_INFLUX_TOKEN="$EXTRACTED_TOKEN"
+                echo "${STEP_PREFIX} Using token from InfluxDB setup response"
+            fi
             sleep 1
             VERIFY_STATUS=$(curl -s http://localhost:8086/api/v2/setup 2>&1)
             if echo "$VERIFY_STATUS" | grep -q "\"allowed\":false"; then
@@ -196,6 +195,14 @@ if wait_for_service "InfluxDB" 8086 30 "http://localhost:8086/health"; then
             echo "${ERROR_PREFIX}   Org: $SETUP_ORG"
             echo "${ERROR_PREFIX}   Bucket: $SETUP_BUCKET"
         fi
+    fi
+    
+    # Verify our token works (avoid 'unauthorized' writes later)
+    BUCKETS_HTTP=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Token $RESOLVED_INFLUX_TOKEN" "http://localhost:8086/api/v2/buckets?org=screenjournal-org" 2>&1)
+    if [ "$BUCKETS_HTTP" = "401" ] || [ "$BUCKETS_HTTP" = "000" ]; then
+        echo "${ERROR_PREFIX} InfluxDB token verification failed (HTTP $BUCKETS_HTTP). Writes will fail with 'unauthorized'."
+        echo "${ERROR_PREFIX} To fix: quit the app, delete the InfluxDB data directory, then restart:"
+        echo "${ERROR_PREFIX}   rm -rf \"$INFLUXDB_DATA_DIR\""
     fi
 else
     echo "${PROGRESS_PREFIX} influxdb:failed"
@@ -215,13 +222,13 @@ fi
 STORAGE_DIR="$APP_DATA_DIR/storage"
 mkdir -p "$STORAGE_DIR"
 
-# Start collector with environment variables
+# Start collector with environment variables (use resolved InfluxDB token)
 cd "$APP_DATA_DIR"
 SERVER_HOST=0.0.0.0 \
 SERVER_PORT=8080 \
 JWT_SECRET=screenjournal-bundled-secret-key \
 INFLUXDB2_URL=http://localhost:8086 \
-INFLUXDB2_TOKEN=screenjournal-admin-token-change-in-production \
+INFLUXDB2_TOKEN="$RESOLVED_INFLUX_TOKEN" \
 INFLUXDB2_ORG=screenjournal-org \
 INFLUXDB2_BUCKET=screenjournal-metrics \
 STORAGE_BASE_PATH="$STORAGE_DIR" \
@@ -247,12 +254,12 @@ if [ ! -f "$REPORT_BINARY" ]; then
     exit 1
 fi
 
-# Start report service with environment variables
+# Start report service with environment variables (use resolved InfluxDB token)
 cd "$APP_DATA_DIR"
 PORT=8085 \
 HOST=0.0.0.0 \
 INFLUXDB2_URL=http://localhost:8086 \
-INFLUXDB2_TOKEN=screenjournal-admin-token-change-in-production \
+INFLUXDB2_TOKEN="$RESOLVED_INFLUX_TOKEN" \
 INFLUXDB2_ORG=screenjournal-org \
 INFLUXDB2_BUCKET=screenjournal-metrics \
 MONGODB_HOST=localhost \
