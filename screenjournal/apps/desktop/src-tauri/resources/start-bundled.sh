@@ -119,7 +119,11 @@ mkdir -p "$INFLUXDB_DATA_DIR"
 
 # InfluxDB paths and default token (used by collector/report; may be updated after setup)
 BOLT_PATH="$INFLUXDB_DATA_DIR/influxdb.bolt"
+# Run setup on first run (no bolt file) OR when API says setup is allowed
 NEEDS_SETUP="false"
+if [ ! -f "$BOLT_PATH" ]; then
+    NEEDS_SETUP="true"
+fi
 RESOLVED_INFLUX_TOKEN="screenjournal-admin-token-change-in-production"
 
 # Start InfluxDB
@@ -137,13 +141,15 @@ INFLUXDB_PID=$!
 if wait_for_service "InfluxDB" 8086 30 "http://localhost:8086/health"; then
     echo "${PROGRESS_PREFIX} influxdb:ready"
     
-    # Decide setup purely from API (source of truth; don't use bolt file)
+    # Also check API: run setup when API says allowed (handles partial/corrupt state)
     sleep 2  # Give InfluxDB a moment to fully initialize
     SETUP_STATUS=$(curl -s http://localhost:8086/api/v2/setup 2>&1)
-    
     if echo "$SETUP_STATUS" | grep -q "\"allowed\":true"; then
         echo "${STEP_PREFIX} InfluxDB needs setup (detected via API)"
         NEEDS_SETUP="true"
+    fi
+    if [ "$NEEDS_SETUP" = "true" ]; then
+        echo "${STEP_PREFIX} InfluxDB needs setup (first run or API indicated setup required)"
     else
         echo "${STEP_PREFIX} InfluxDB appears to be already set up"
     fi
