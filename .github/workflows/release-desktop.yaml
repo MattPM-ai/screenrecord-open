@@ -19,7 +19,7 @@
 #     APPLE_ID - Apple ID email
 #     APPLE_PASSWORD - App-specific password (from appleid.apple.com)
 
-name: Release Desktop App
+name: "Release Desktop App"
 
 on:
   push:
