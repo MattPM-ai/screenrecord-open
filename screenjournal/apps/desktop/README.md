@@ -123,6 +123,42 @@ npm run sign-app
 - No permission prompts on subsequent launches
 - No `_CFBundleCreateUnique failed` errors in Console.app
 
+## Bundled app layout (macOS and Windows)
+
+The installer creates **one folder** that contains the desktop app and all backend services. The desktop app runs a **start script** in that folder to launch the servers (same idea on both platforms).
+
+**Target layout after install:**
+
+```
+<InstallFolder>/
+├── ScreenJournal Tracker.exe     (Windows)  or  ScreenJournal Tracker.app (macOS)
+├── start-bundled.bat             (Windows)  or  start-bundled.sh (inside .app on macOS)
+└── resources/                     (or Contents/Resources inside .app on macOS)
+    ├── start-bundled.bat         (Windows)
+    ├── start-bundled.sh          (macOS)
+    ├── binaries/
+    │   ├── sj-collector.exe      (Windows)  /  sj-collector (macOS)
+    │   └── sj-tracker-report.exe (Windows)  /  sj-tracker-report (macOS)
+    ├── python/
+    │   └── sj-tracker-chat-agent/
+    │       └── sj-chat-agent[.exe]
+    ├── databases/
+    │   ├── mongodb/<platform>/<arch>/
+    │   └── influxdb/<platform>/<arch>/
+    ├── frontend/
+    │   └── sj-tracker-frontend/   (Next.js standalone or build)
+    ├── activitywatch/
+    │   └── <platform>/<arch>/     (aw-server, aw-watcher-*)
+    ├── ffmpeg/
+    │   └── <platform>/<arch>/
+    └── whisper-tiny.en.bin        (Whisper model)
+```
+
+- The **desktop exe/app** resolves `resource_dir` to that `resources/` folder and runs `start-bundled.bat` (Windows) or `start-bundled.sh` (macOS) with `RESOURCE_DIR` and `APP_DATA_DIR` set.
+- The **start script** starts MongoDB, InfluxDB, sj-collector, sj-tracker-report, chat agent, and (if available) the report frontend from `resources/`.
+
+The root **build-bundled.sh** (repo root) and `tauri.conf.json` `bundle.resources` are set up so this layout is produced on both platforms.
+
 ## Production Distribution
 
 When you build your app with `npm run tauri:build`, the ActivityWatch binaries are **automatically bundled** into the final application. End users who download your app will have all binaries included - they don't need to download anything separately.

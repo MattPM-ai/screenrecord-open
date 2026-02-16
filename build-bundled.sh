@@ -65,9 +65,14 @@ echo -e "${GREEN}✅ Build directory created${NC}"
 echo ""
 
 # Build sj-collector
+# On Windows (Git Bash), use relative -o path so Go writes to the expected location
 echo -e "${BLUE}🔧 Building sj-collector backend...${NC}"
 cd sj-collector
-go build -o "$BUILD_DIR/binaries/sj-collector" ./cmd/server
+if [[ $IS_WINDOWS -eq 1 ]]; then
+    go build -o "../dist-bundled/binaries/sj-collector" ./cmd/server
+else
+    go build -o "$BUILD_DIR/binaries/sj-collector" ./cmd/server
+fi
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ sj-collector built successfully${NC}"
 else
@@ -80,7 +85,11 @@ echo ""
 # Build sj-tracker-report
 echo -e "${BLUE}🔧 Building sj-tracker-report backend...${NC}"
 cd sj-tracker-report
-go build -o "$BUILD_DIR/binaries/sj-tracker-report" ./cmd/server
+if [[ $IS_WINDOWS -eq 1 ]]; then
+    go build -o "../dist-bundled/binaries/sj-tracker-report" ./cmd/server
+else
+    go build -o "$BUILD_DIR/binaries/sj-tracker-report" ./cmd/server
+fi
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ sj-tracker-report built successfully${NC}"
 else
