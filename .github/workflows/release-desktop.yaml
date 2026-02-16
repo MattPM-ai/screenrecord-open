@@ -91,14 +91,6 @@ jobs:
             name: Windows
     runs-on: ${{ matrix.platform }}
     steps:
-      # Use a short workspace path on Windows to avoid NSIS "file not found" from 260-char path limit
-      - name: Use short workspace path (Windows)
-        if: matrix.platform == 'windows-latest'
-        run: |
-          New-Item -ItemType Directory -Force -Path C:\r | Out-Null
-          echo "GITHUB_WORKSPACE=C:\r" >> $env:GITHUB_ENV
-        shell: powershell
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -320,8 +312,17 @@ jobs:
         if: matrix.platform == 'macos-latest'
         run: chmod +x ./build-bundled.sh
 
+      # Copy repo to short path on Windows so NSIS can open deep frontend paths (< 260 chars)
+      - name: Copy to short path (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          New-Item -ItemType Directory -Force -Path C:\r | Out-Null
+          xcopy /E /I /H /Y . C:\r\
+        shell: cmd
+
       - name: Run bundled build script
         shell: bash
+        working-directory: ${{ matrix.platform == 'windows-latest' && 'C:/r' || '.' }}
         run: ./build-bundled.sh
         env:
           # Gemini API key - embedded at build time if needed
@@ -387,6 +388,7 @@ jobs:
 
       - name: Find and upload Windows installers
         if: matrix.platform == 'windows-latest'
+        working-directory: C:\r
         uses: actions/github-script@v7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
