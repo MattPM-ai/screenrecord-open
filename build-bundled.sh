@@ -16,7 +16,17 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
+# Detect Windows (Git Bash, Cygwin, or WINDIR set) for cross-platform build
+IS_WINDOWS=0
+if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "win32" ]] || [[ -n "${WINDIR:-}" ]]; then
+    IS_WINDOWS=1
+fi
+# Venv activate path: Windows uses Scripts/, Unix uses bin/
+VENV_ACTIVATE="venv-build/bin/activate"
+[[ $IS_WINDOWS -eq 1 ]] && VENV_ACTIVATE="venv-build/Scripts/activate"
+
 echo -e "${GREEN}🔨 Building Bundled ScreenJournal Application${NC}"
+[[ $IS_WINDOWS -eq 1 ]] && echo -e "${YELLOW}   (Windows build)${NC}"
 echo ""
 
 # Function to check if a command exists
@@ -94,7 +104,7 @@ echo -e "${YELLOW}📦 Creating build virtual environment...${NC}"
 python3 -m venv venv-build
 
 echo -e "${YELLOW}📦 Installing dependencies including PyInstaller...${NC}"
-source venv-build/bin/activate
+source "$VENV_ACTIVATE"
 python3 -m pip install --upgrade pip
 python3 -m pip install -r requirements.txt
 python3 -m pip install pyinstaller
@@ -190,14 +200,14 @@ EOF
 
 # Build standalone executable with PyInstaller
 echo -e "${YELLOW}📦 Building standalone executable with PyInstaller...${NC}"
-source venv-build/bin/activate
+source "$VENV_ACTIVATE"
 pyinstaller --clean --noconfirm chat-agent.spec
 deactivate
 
 # Determine the executable name based on platform
 if [[ "$OSTYPE" == "darwin"* ]]; then
     CHAT_AGENT_EXE="dist/sj-chat-agent"
-elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
+elif [[ $IS_WINDOWS -eq 1 ]]; then
     CHAT_AGENT_EXE="dist/sj-chat-agent.exe"
 else
     CHAT_AGENT_EXE="dist/sj-chat-agent"
@@ -211,8 +221,12 @@ fi
 # Copy the standalone executable to bundled resources
 echo -e "${YELLOW}📦 Copying standalone executable to bundled resources...${NC}"
 mkdir -p "$BUILD_DIR/python/sj-tracker-chat-agent"
-cp "$CHAT_AGENT_EXE" "$BUILD_DIR/python/sj-tracker-chat-agent/sj-chat-agent"
-chmod +x "$BUILD_DIR/python/sj-tracker-chat-agent/sj-chat-agent"
+if [[ $IS_WINDOWS -eq 1 ]]; then
+    cp "$CHAT_AGENT_EXE" "$BUILD_DIR/python/sj-tracker-chat-agent/sj-chat-agent.exe"
+else
+    cp "$CHAT_AGENT_EXE" "$BUILD_DIR/python/sj-tracker-chat-agent/sj-chat-agent"
+    chmod +x "$BUILD_DIR/python/sj-tracker-chat-agent/sj-chat-agent"
+fi
 
 # Clean up build artifacts
 rm -rf build dist chat-agent.spec
@@ -283,9 +297,14 @@ echo -e "${YELLOW}📦 Copying resources to Tauri app...${NC}"
 mkdir -p "$TAURI_RESOURCES_DIR/binaries"
 mkdir -p "$TAURI_RESOURCES_DIR/python"
 
-# Copy Go binaries
-cp "$BUILD_DIR/binaries/sj-collector" "$TAURI_RESOURCES_DIR/binaries/"
-cp "$BUILD_DIR/binaries/sj-tracker-report" "$TAURI_RESOURCES_DIR/binaries/"
+# Copy Go binaries (Windows: Go emits .exe; Unix: no extension)
+if [[ $IS_WINDOWS -eq 1 ]]; then
+    cp "$BUILD_DIR/binaries/sj-collector.exe" "$TAURI_RESOURCES_DIR/binaries/"
+    cp "$BUILD_DIR/binaries/sj-tracker-report.exe" "$TAURI_RESOURCES_DIR/binaries/"
+else
+    cp "$BUILD_DIR/binaries/sj-collector" "$TAURI_RESOURCES_DIR/binaries/"
+    cp "$BUILD_DIR/binaries/sj-tracker-report" "$TAURI_RESOURCES_DIR/binaries/"
+fi
 
 # Copy Python standalone executable (created by PyInstaller)
 cp -r "$BUILD_DIR/python/sj-tracker-chat-agent" "$TAURI_RESOURCES_DIR/python/"

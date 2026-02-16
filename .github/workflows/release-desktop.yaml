@@ -1,6 +1,6 @@
 # Release Desktop App Workflow
 #
-# Builds and publishes the ScreenJournal Open desktop app for macOS.
+# Builds and publishes the ScreenJournal Open desktop app for macOS and Windows.
 # This version bundles all services (databases, backends, frontend) into a standalone app.
 # Triggers on version tags (v*.*.*) or manual dispatch.
 #
@@ -68,20 +68,28 @@ jobs:
               repo: context.repo.repo,
               tag_name: `v${{ steps.version.outputs.version }}`,
               name: `ScreenJournal Open v${{ steps.version.outputs.version }}`,
-              body: `## ScreenJournal Open v${{ steps.version.outputs.version }}\n\nDownload the macOS installer below.\n\n### Installation\n- **macOS**: Download the .dmg file and drag to Applications`,
+              body: `## ScreenJournal Open v${{ steps.version.outputs.version }}\n\nDownload the installer for your platform below.\n\n### Installation\n- **macOS**: Download the .dmg file and drag to Applications\n- **Windows**: Download the .exe or .msi installer and run it`,
               draft: true,
               prerelease: false
             })
             return data.id
 
   # =============================================================================
-  # Build for macOS
+  # Build for macOS and Windows
   # =============================================================================
   build:
     needs: create-release
     permissions:
       contents: write
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            name: macOS
+          - platform: windows-latest
+            name: Windows
+    runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -116,8 +124,15 @@ jobs:
       # Platform-specific dependencies
       # =========================================================================
       - name: Install macOS dependencies
+        if: matrix.platform == 'macos-latest'
         run: |
           brew install ffmpeg || true
+
+      - name: Install Windows dependencies (LLVM for whisper-rs)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          choco install llvm -y
+          echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $env:GITHUB_ENV
 
       # =========================================================================
       # Install npm dependencies
@@ -157,10 +172,10 @@ jobs:
         working-directory: screenjournal/apps/desktop
 
       # =========================================================================
-      # Import Apple Code Signing Certificate
+      # Import Apple Code Signing Certificate (macOS only)
       # =========================================================================
       - name: Import Apple Certificate
-        if: env.APPLE_CERTIFICATE != ''
+        if: matrix.platform == 'macos-latest' && env.APPLE_CERTIFICATE != ''
         run: |
           echo "🔐 Importing Apple Developer ID certificate..."
           # Create temporary keychain for certificate
@@ -188,9 +203,10 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
       # =========================================================================
-      # Setup App Store Connect API Key (.p8 file) for Notarization
+      # Setup App Store Connect API Key (.p8 file) for Notarization (macOS only)
       # =========================================================================
       - name: Setup App Store Connect API Key
+        if: matrix.platform == 'macos-latest'
         run: |
           echo "🔑 Setting up App Store Connect API key for notarization..."
           
@@ -238,12 +254,13 @@ jobs:
           APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
 
       # =========================================================================
-      # Sign External Binaries (FFmpeg and ActivityWatch)
+      # Sign External Binaries (FFmpeg and ActivityWatch) — macOS only
       # =========================================================================
       # NOTE: We sign ActivityWatch/FFmpeg BEFORE bundling to ensure Python.framework
       # symlinks are properly handled. This must happen before build-bundled.sh runs
       # to avoid interfering with PyInstaller, but AFTER setup-aw/setup-ffmpeg.
       - name: Sign ActivityWatch and FFmpeg Binaries
+        if: matrix.platform == 'macos-latest'
         env:
           IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           ENTITLEMENTS: "screenjournal/apps/desktop/src-tauri/entitlements.plist"
@@ -292,6 +309,7 @@ jobs:
       # Make build script executable and run it
       # =========================================================================
       - name: Make build script executable
+        if: matrix.platform == 'macos-latest'
         run: chmod +x ./build-bundled.sh
 
       - name: Run bundled build script
@@ -321,6 +339,7 @@ jobs:
       # Upload artifacts to release
       # =========================================================================
       - name: Find and upload macOS DMG
+        if: matrix.platform == 'macos-latest'
         uses: actions/github-script@v7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -333,8 +352,6 @@ jobs:
             const path = require('path');
             const { execSync } = require('child_process');
             
-            // Find DMG file
-            const dmgPattern = 'screenjournal/apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg';
             const dmgFiles = execSync(`find screenjournal/apps/desktop/src-tauri/target -name "*.dmg" -type f`, { encoding: 'utf-8' }).trim().split('\n').filter(f => f);
             
             if (dmgFiles.length === 0) {
@@ -359,6 +376,53 @@ jobs:
             });
             
             console.log(`Uploaded: ${data.browser_download_url}`);
+
+      - name: Find and upload Windows installers
+        if: matrix.platform == 'windows-latest'
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+          VERSION: ${{ needs.create-release.outputs.version }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            const bundleDir = path.join('screenjournal', 'apps', 'desktop', 'src-tauri', 'target', 'release', 'bundle');
+            const files = [];
+            function walk(dir) {
+              if (!fs.existsSync(dir)) return;
+              for (const name of fs.readdirSync(dir)) {
+                const full = path.join(dir, name);
+                const stat = fs.statSync(full);
+                if (stat.isDirectory()) walk(full);
+                else if (name.endsWith('.exe') || name.endsWith('.msi')) files.push(full);
+              }
+            }
+            walk(bundleDir);
+            
+            if (files.length === 0) {
+              throw new Error('No Windows installer (.exe or .msi) found in ' + bundleDir);
+            }
+            
+            const version = process.env.VERSION;
+            for (const filePath of files) {
+              const base = path.basename(filePath);
+              const assetName = base.includes(version) ? base : `ScreenJournal-Open-${path.basename(filePath, path.extname(filePath))}-${version}${path.extname(filePath)}`;
+              const data = fs.readFileSync(filePath);
+              const ext = path.extname(assetName).toLowerCase();
+              const contentType = ext === '.msi' ? 'application/x-msi' : 'application/x-msdownload';
+              await github.rest.repos.uploadReleaseAsset({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: parseInt(process.env.RELEASE_ID),
+                name: assetName,
+                data,
+                headers: { 'content-type': contentType, 'content-length': data.length }
+              });
+              console.log('Uploaded: ' + assetName);
+            }
 
   # =============================================================================
   # Publish Release (after all builds complete)
