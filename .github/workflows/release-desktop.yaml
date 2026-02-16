@@ -91,6 +91,14 @@ jobs:
             name: Windows
     runs-on: ${{ matrix.platform }}
     steps:
+      # Use a short workspace path on Windows to avoid NSIS "file not found" from 260-char path limit
+      - name: Use short workspace path (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          New-Item -ItemType Directory -Force -Path C:\r | Out-Null
+          echo "GITHUB_WORKSPACE=C:\r" >> $env:GITHUB_ENV
+        shell: powershell
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
