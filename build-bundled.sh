@@ -64,21 +64,27 @@ mkdir -p "$BUILD_DIR/python"
 echo -e "${GREEN}✅ Build directory created${NC}"
 echo ""
 
-# Build sj-collector
-# On Windows (Git Bash), use relative -o path so Go writes to the expected location
+# Build sj-collector (each service has its own go.mod, so we must build from its directory)
 echo -e "${BLUE}🔧 Building sj-collector backend...${NC}"
 cd sj-collector
 if [[ $IS_WINDOWS -eq 1 ]]; then
-    go build -o "../dist-bundled/binaries/sj-collector" ./cmd/server
+    # Explicit .exe in path; path relative to sj-collector so Go resolves it from CWD
+    go build -o "../dist-bundled/binaries/sj-collector.exe" ./cmd/server
 else
     go build -o "$BUILD_DIR/binaries/sj-collector" ./cmd/server
 fi
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅ sj-collector built successfully${NC}"
-else
+if [ $? -ne 0 ]; then
     echo -e "${RED}❌ Failed to build sj-collector${NC}"
     exit 1
 fi
+if [[ $IS_WINDOWS -eq 1 ]]; then
+    if [ ! -f "../dist-bundled/binaries/sj-collector.exe" ]; then
+        echo -e "${RED}❌ sj-collector.exe not found after build${NC}"
+        ls -la ../dist-bundled/binaries/ 2>/dev/null || true
+        exit 1
+    fi
+fi
+echo -e "${GREEN}✅ sj-collector built successfully${NC}"
 cd ..
 echo ""
 
@@ -86,16 +92,22 @@ echo ""
 echo -e "${BLUE}🔧 Building sj-tracker-report backend...${NC}"
 cd sj-tracker-report
 if [[ $IS_WINDOWS -eq 1 ]]; then
-    go build -o "../dist-bundled/binaries/sj-tracker-report" ./cmd/server
+    go build -o "../dist-bundled/binaries/sj-tracker-report.exe" ./cmd/server
 else
     go build -o "$BUILD_DIR/binaries/sj-tracker-report" ./cmd/server
 fi
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅ sj-tracker-report built successfully${NC}"
-else
+if [ $? -ne 0 ]; then
     echo -e "${RED}❌ Failed to build sj-tracker-report${NC}"
     exit 1
 fi
+if [[ $IS_WINDOWS -eq 1 ]]; then
+    if [ ! -f "../dist-bundled/binaries/sj-tracker-report.exe" ]; then
+        echo -e "${RED}❌ sj-tracker-report.exe not found after build${NC}"
+        ls -la ../dist-bundled/binaries/ 2>/dev/null || true
+        exit 1
+    fi
+fi
+echo -e "${GREEN}✅ sj-tracker-report built successfully${NC}"
 cd ..
 echo ""
 
@@ -308,8 +320,18 @@ mkdir -p "$TAURI_RESOURCES_DIR/python"
 
 # Copy Go binaries (Windows: Go emits .exe; Unix: no extension)
 if [[ $IS_WINDOWS -eq 1 ]]; then
-    cp "$BUILD_DIR/binaries/sj-collector.exe" "$TAURI_RESOURCES_DIR/binaries/"
-    cp "$BUILD_DIR/binaries/sj-tracker-report.exe" "$TAURI_RESOURCES_DIR/binaries/"
+    for name in sj-collector sj-tracker-report; do
+        if [ -f "$BUILD_DIR/binaries/${name}.exe" ]; then
+            cp "$BUILD_DIR/binaries/${name}.exe" "$TAURI_RESOURCES_DIR/binaries/"
+        elif [ -f "$BUILD_DIR/binaries/$name" ]; then
+            cp "$BUILD_DIR/binaries/$name" "$TAURI_RESOURCES_DIR/binaries/${name}.exe"
+        else
+            echo -e "${RED}❌ $name binary not found in $BUILD_DIR/binaries/${NC}"
+            echo "Contents of $BUILD_DIR/binaries/:"
+            ls -la "$BUILD_DIR/binaries/" 2>/dev/null || true
+            exit 1
+        fi
+    done
 else
     cp "$BUILD_DIR/binaries/sj-collector" "$TAURI_RESOURCES_DIR/binaries/"
     cp "$BUILD_DIR/binaries/sj-tracker-report" "$TAURI_RESOURCES_DIR/binaries/"
