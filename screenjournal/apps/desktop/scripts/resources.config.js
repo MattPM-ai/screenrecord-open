@@ -115,14 +115,15 @@ const resources = {
     skipEnvVar: 'SKIP_FFMPEG_CHECK',
     
     platforms: {
+      // https://ffmpeg.martin-riedl.de/ (evermeet.cx no longer serves 7.1.1/8.0.1)
       'darwin-aarch64': {
-        url: 'https://evermeet.cx/ffmpeg/ffmpeg-7.1.1.zip',
+        url: 'https://ffmpeg.martin-riedl.de/download/macos/arm64/1766430132_8.0.1/ffmpeg.zip',
         archiveType: 'zip',
         binaryName: 'ffmpeg',
         extractedName: 'ffmpeg',
       },
       'darwin-x86_64': {
-        url: 'https://evermeet.cx/ffmpeg/ffmpeg-7.1.1.zip',
+        url: 'https://ffmpeg.martin-riedl.de/download/macos/amd64/1766437297_8.0.1/ffmpeg.zip',
         archiveType: 'zip',
         binaryName: 'ffmpeg',
         extractedName: 'ffmpeg',
