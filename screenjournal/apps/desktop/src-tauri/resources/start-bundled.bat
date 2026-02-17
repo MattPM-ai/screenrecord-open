@@ -23,7 +23,11 @@ REM Determine platform and architecture (Windows)
 set PLATFORM=windows
 set ARCH=x86_64
 
-REM Function to check if a port is in use
+REM Jump to main so we do not fall through into helper labels (CMD runs top-to-bottom).
+goto :main
+
+REM ----- Helper "functions" (only entered via call :label) -----
+REM Check if a port is in use
 :port_in_use
 netstat -an | findstr ":%1" | findstr "LISTENING" >nul 2>&1
 if %errorlevel%==0 (
@@ -69,6 +73,8 @@ if not "%check_url%"=="" (
 timeout /t 1 /nobreak >nul 2>&1
 goto wait_loop
 
+REM ----- Main sequence (services started in order) -----
+:main
 REM Start MongoDB
 echo %STEP_PREFIX% Starting MongoDB...
 set MONGOD_PATH=%RESOURCE_DIR%\databases\mongodb\%PLATFORM%\%ARCH%\mongod.exe
@@ -90,13 +96,14 @@ for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq mongod.exe" /FO LIST ^| fi
 
 REM Wait for MongoDB
 call :wait_for_service "MongoDB" 27017 30 ""
-if %errorlevel%==0 (
-    echo %PROGRESS_PREFIX% mongodb:ready
-) else (
-    echo %PROGRESS_PREFIX% mongodb:failed
-    taskkill /F /IM mongod.exe >nul 2>&1
-    exit /b 1
-)
+if errorlevel 1 goto mongo_failed
+echo %PROGRESS_PREFIX% mongodb:ready
+goto mongo_done
+:mongo_failed
+echo %PROGRESS_PREFIX% mongodb:failed
+taskkill /F /IM mongod.exe >nul 2>&1
+exit /b 1
+:mongo_done
 
 REM Start InfluxDB
 echo %STEP_PREFIX% Starting InfluxDB...
@@ -130,57 +137,19 @@ for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq influxd.exe" /FO LIST ^| f
 
 REM Wait for InfluxDB to be ready
 call :wait_for_service "InfluxDB" 8086 30 "http://localhost:8086/health"
-if %errorlevel%==0 (
-    echo %PROGRESS_PREFIX% influxdb:ready
-    
-    REM Always check setup status via API
-    timeout /t 2 /nobreak >nul 2>&1
-    powershell -Command "$response = Invoke-RestMethod -Uri 'http://localhost:8086/api/v2/setup' -Method Get -ErrorAction SilentlyContinue; if ($response.allowed -eq $true) { exit 0 } else { exit 1 }" >nul 2>&1
-    if %errorlevel%==0 (
-        echo %STEP_PREFIX% InfluxDB needs setup (detected via API)
-        set NEEDS_SETUP=true
-    ) else if "%NEEDS_SETUP%"=="true" (
-        echo %STEP_PREFIX% InfluxDB needs setup (no bolt file found)
-    ) else (
-        echo %STEP_PREFIX% InfluxDB appears to be already set up
-    )
-    
-    REM If setup is needed, use InfluxDB REST API to set it up
-    if "%NEEDS_SETUP%"=="true" (
-        echo %STEP_PREFIX% Setting up InfluxDB (creating user, org, bucket)...
-        
-        set SETUP_USERNAME=admin
-        set SETUP_PASSWORD=admin123
-        set SETUP_ORG=screenjournal-org
-        set SETUP_BUCKET=screenjournal-metrics
-        set SETUP_TOKEN=screenjournal-admin-token
-        
-        REM Call the setup API endpoint using PowerShell
-        powershell -Command "$body = @{username='%SETUP_USERNAME%'; password='%SETUP_PASSWORD%'; org='%SETUP_ORG%'; bucket='%SETUP_BUCKET%'; token='%SETUP_TOKEN%'} | ConvertTo-Json; $response = Invoke-RestMethod -Uri 'http://localhost:8086/api/v2/setup' -Method Post -Body $body -ContentType 'application/json' -ErrorAction SilentlyContinue; if ($response.user -or $response.auth) { Write-Host 'SUCCESS'; exit 0 } else { Write-Host 'FAILED'; exit 1 }" >nul 2>&1
-        if %errorlevel%==0 (
-            echo %SUCCESS_PREFIX% InfluxDB setup completed successfully
-            timeout /t 1 /nobreak >nul 2>&1
-            powershell -Command "$response = Invoke-RestMethod -Uri 'http://localhost:8086/api/v2/setup' -Method Get -ErrorAction SilentlyContinue; if ($response.allowed -eq $false) { exit 0 } else { exit 1 }" >nul 2>&1
-            if %errorlevel%==0 (
-                echo %SUCCESS_PREFIX% InfluxDB setup verified
-            ) else (
-                echo %ERROR_PREFIX% InfluxDB setup may have failed - verification failed
-            )
-        ) else (
-            echo %ERROR_PREFIX% InfluxDB setup failed
-            echo %ERROR_PREFIX% You may need to visit http://localhost:8086 to complete setup manually.
-            echo %ERROR_PREFIX% Use these credentials:
-            echo %ERROR_PREFIX%   Username: %SETUP_USERNAME%
-            echo %ERROR_PREFIX%   Password: %SETUP_PASSWORD%
-            echo %ERROR_PREFIX%   Org: %SETUP_ORG%
-            echo %ERROR_PREFIX%   Bucket: %SETUP_BUCKET%
-        )
-    )
-) else (
-    echo %PROGRESS_PREFIX% influxdb:failed
-    taskkill /F /IM influxd.exe >nul 2>&1
-    exit /b 1
-)
+if errorlevel 1 goto influx_failed
+echo %PROGRESS_PREFIX% influxdb:ready
+REM Check if InfluxDB needs initial setup (flat flow to avoid nested if/else parsing)
+timeout /t 2 /nobreak >nul 2>&1
+powershell -Command "$response = Invoke-RestMethod -Uri 'http://localhost:8086/api/v2/setup' -Method Get -ErrorAction SilentlyContinue; if ($response.allowed -eq $true) { exit 0 } else { exit 1 }" >nul 2>&1
+if errorlevel 1 set NEEDS_SETUP=true
+if "%NEEDS_SETUP%"=="true" call :do_influx_setup
+goto after_influx
+:influx_failed
+echo %PROGRESS_PREFIX% influxdb:failed
+taskkill /F /IM influxd.exe >nul 2>&1
+exit /b 1
+:after_influx
 
 REM Start Collector
 echo %STEP_PREFIX% Starting Collector...
@@ -215,13 +184,14 @@ for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq sj-collector.exe" /FO LIST
 REM Wait for Collector
 timeout /t 2 /nobreak >nul 2>&1
 call :wait_for_service "Collector" 8080 30 "http://localhost:8080/health"
-if %errorlevel%==0 (
-    echo %PROGRESS_PREFIX% collector:ready
-) else (
-    echo %PROGRESS_PREFIX% collector:failed
-    taskkill /F /IM sj-collector.exe >nul 2>&1
-    exit /b 1
-)
+if errorlevel 1 goto collector_failed
+echo %PROGRESS_PREFIX% collector:ready
+goto collector_done
+:collector_failed
+echo %PROGRESS_PREFIX% collector:failed
+taskkill /F /IM sj-collector.exe >nul 2>&1
+exit /b 1
+:collector_done
 
 REM Start Report Service
 echo %STEP_PREFIX% Starting Report Service...
@@ -256,13 +226,14 @@ for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq sj-tracker-report.exe" /FO
 REM Wait for Report Service
 timeout /t 2 /nobreak >nul 2>&1
 call :wait_for_service "Report Service" 8085 30 "http://localhost:8085/health"
-if %errorlevel%==0 (
-    echo %PROGRESS_PREFIX% report:ready
-) else (
-    echo %PROGRESS_PREFIX% report:failed
-    taskkill /F /IM sj-tracker-report.exe >nul 2>&1
-    exit /b 1
-)
+if errorlevel 1 goto report_failed
+echo %PROGRESS_PREFIX% report:ready
+goto report_done
+:report_failed
+echo %PROGRESS_PREFIX% report:failed
+taskkill /F /IM sj-tracker-report.exe >nul 2>&1
+exit /b 1
+:report_done
 
 REM Start Chat Agent (using PyInstaller standalone executable)
 echo %STEP_PREFIX% Starting Chat Agent...
@@ -285,23 +256,21 @@ REM Get PID
 timeout /t 3 /nobreak >nul 2>&1
 for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq sj-chat-agent.exe" /FO LIST ^| findstr "PID:"') do set CHAT_AGENT_PID=%%a
 
-REM Wait for Chat Agent (give it more time - Python startup can be slow)
+REM Wait for Chat Agent (give it more time - Python startup can be slow). Optional: do not exit on failure.
 timeout /t 3 /nobreak >nul 2>&1
 call :wait_for_service "Chat Agent" 8087 60 "http://localhost:8087/health"
-if %errorlevel%==0 (
-    echo %PROGRESS_PREFIX% chat_agent:ready
-) else (
-    REM Don't exit on chat agent failure - it's not critical for basic functionality
-    echo %PROGRESS_PREFIX% chat_agent:failed
-    REM Check if process is still running
-    tasklist /FI "IMAGENAME eq sj-chat-agent.exe" | findstr "sj-chat-agent.exe" >nul 2>&1
-    if %errorlevel%==0 (
-        echo %PROGRESS_PREFIX% chat_agent:starting (process running, may start later)
-    ) else (
-        echo %PROGRESS_PREFIX% chat_agent:failed (process exited)
-    )
-    REM Continue anyway - chat agent is optional
-)
+if errorlevel 1 goto chat_optional_fail
+echo %PROGRESS_PREFIX% chat_agent:ready
+goto after_chat
+:chat_optional_fail
+echo %PROGRESS_PREFIX% chat_agent:failed
+tasklist /FI "IMAGENAME eq sj-chat-agent.exe" | findstr "sj-chat-agent.exe" >nul 2>&1
+if errorlevel 1 goto chat_exited
+echo %PROGRESS_PREFIX% chat_agent:starting (process running, may start later)
+goto after_chat
+:chat_exited
+echo %PROGRESS_PREFIX% chat_agent:failed (process exited)
+:after_chat
 
 REM Start Report Frontend (optional - requires Node.js)
 echo %STEP_PREFIX% Starting Report Frontend...
@@ -357,20 +326,19 @@ if not exist "%FRONTEND_DIR%" (
         
         timeout /t 3 /nobreak >nul 2>&1
         call :wait_for_service "Frontend" 3030 30 "http://localhost:3030"
-        if %errorlevel%==0 (
-            echo %PROGRESS_PREFIX% frontend:ready
-        ) else (
-            echo %PROGRESS_PREFIX% frontend:failed
-            echo %ERROR_PREFIX% Frontend failed to start. Check logs at: %APP_DATA_DIR%\frontend.log
-            REM Check if process is still running
-            tasklist /FI "IMAGENAME eq node.exe" | findstr "node.exe" >nul 2>&1
-            if %errorlevel%==0 (
-                echo %STEP_PREFIX% Frontend process is still running, may start later
-            ) else (
-                echo %ERROR_PREFIX% Frontend process exited
-            )
-            REM Don't kill it - let it continue trying
-        )
+        if errorlevel 1 goto frontend_wait_failed
+        echo %PROGRESS_PREFIX% frontend:ready
+        goto frontend_wait_done
+        :frontend_wait_failed
+        echo %PROGRESS_PREFIX% frontend:failed
+        echo %ERROR_PREFIX% Frontend failed to start. Check logs at: %APP_DATA_DIR%\frontend.log
+        tasklist /FI "IMAGENAME eq node.exe" | findstr "node.exe" >nul 2>&1
+        if errorlevel 1 goto frontend_exited
+        echo %STEP_PREFIX% Frontend process is still running, may start later
+        goto frontend_wait_done
+        :frontend_exited
+        echo %ERROR_PREFIX% Frontend process exited
+        :frontend_wait_done
     )
 )
 
@@ -392,4 +360,28 @@ REM Keep script running
 :keep_alive
 timeout /t 60 /nobreak >nul 2>&1
 goto keep_alive
+
+REM ----- InfluxDB setup subroutine (called only when NEEDS_SETUP is true) -----
+:do_influx_setup
+echo %STEP_PREFIX% Setting up InfluxDB (creating user, org, bucket)...
+set SETUP_USERNAME=admin
+set SETUP_PASSWORD=admin123
+set SETUP_ORG=screenjournal-org
+set SETUP_BUCKET=screenjournal-metrics
+set SETUP_TOKEN=screenjournal-admin-token
+powershell -Command "$body = @{username='%SETUP_USERNAME%'; password='%SETUP_PASSWORD%'; org='%SETUP_ORG%'; bucket='%SETUP_BUCKET%'; token='%SETUP_TOKEN%'} | ConvertTo-Json; $response = Invoke-RestMethod -Uri 'http://localhost:8086/api/v2/setup' -Method Post -Body $body -ContentType 'application/json' -ErrorAction SilentlyContinue; if ($response.user -or $response.auth) { Write-Host 'SUCCESS'; exit 0 } else { Write-Host 'FAILED'; exit 1 }" >nul 2>&1
+if errorlevel 1 goto influx_setup_failed
+timeout /t 1 /nobreak >nul 2>&1
+powershell -Command "$response = Invoke-RestMethod -Uri 'http://localhost:8086/api/v2/setup' -Method Get -ErrorAction SilentlyContinue; if ($response.allowed -eq $false) { exit 0 } else { exit 1 }" >nul 2>&1
+if errorlevel 1 goto influx_setup_verify_fail
+echo %SUCCESS_PREFIX% InfluxDB setup verified
+exit /b 0
+:influx_setup_verify_fail
+echo %ERROR_PREFIX% InfluxDB setup may have failed - verification failed
+exit /b 0
+:influx_setup_failed
+echo %ERROR_PREFIX% InfluxDB setup failed
+echo %ERROR_PREFIX% You may need to visit http://localhost:8086 to complete setup manually.
+echo %ERROR_PREFIX% Use these credentials: Username: %SETUP_USERNAME% Password: %SETUP_PASSWORD% Org: %SETUP_ORG% Bucket: %SETUP_BUCKET%
+exit /b 0
 
