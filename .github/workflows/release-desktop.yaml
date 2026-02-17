@@ -386,7 +386,7 @@ jobs:
             
             console.log(`Uploaded: ${data.browser_download_url}`);
 
-      - name: Find and upload Windows installers
+      - name: Find and upload Windows installer
         if: matrix.platform == 'windows-latest'
         uses: actions/github-script@v7
         env:
@@ -399,40 +399,32 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             const root = process.env.BUNDLE_WORKSPACE || '.';
-            const bundleDir = path.join(root, 'screenjournal', 'apps', 'desktop', 'src-tauri', 'target', 'release', 'bundle');
-            const files = [];
-            function walk(dir) {
-              if (!fs.existsSync(dir)) return;
-              for (const name of fs.readdirSync(dir)) {
-                const full = path.join(dir, name);
-                const stat = fs.statSync(full);
-                if (stat.isDirectory()) walk(full);
-                else if (name.endsWith('.exe') || name.endsWith('.msi')) files.push(full);
-              }
+            // Only upload the NSIS installer (single standalone setup.exe). Do not upload
+            // bundled resource .exe files (aw-server, ffmpeg, mongod, etc.) — those are
+            // packaged inside the installer and installed into one folder (like macOS).
+            const nsisDir = path.join(root, 'screenjournal', 'apps', 'desktop', 'src-tauri', 'target', 'release', 'bundle', 'nsis');
+            if (!fs.existsSync(nsisDir)) {
+              throw new Error('NSIS bundle directory not found: ' + nsisDir);
             }
-            walk(bundleDir);
-            
-            if (files.length === 0) {
-              throw new Error('No Windows installer (.exe or .msi) found in ' + bundleDir);
+            const names = fs.readdirSync(nsisDir);
+            // Main installer: ProductName_version_arch.exe (exclude Uninstall*.exe)
+            const installerExe = names.find(n => n.endsWith('.exe') && !/^Uninstall/i.test(n));
+            if (!installerExe) {
+              throw new Error('No Windows NSIS installer (.exe) found in ' + nsisDir);
             }
-            
+            const filePath = path.join(nsisDir, installerExe);
             const version = process.env.VERSION;
-            for (const filePath of files) {
-              const base = path.basename(filePath);
-              const assetName = base.includes(version) ? base : `ScreenJournal-Open-${path.basename(filePath, path.extname(filePath))}-${version}${path.extname(filePath)}`;
-              const data = fs.readFileSync(filePath);
-              const ext = path.extname(assetName).toLowerCase();
-              const contentType = ext === '.msi' ? 'application/x-msi' : 'application/x-msdownload';
-              await github.rest.repos.uploadReleaseAsset({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                release_id: parseInt(process.env.RELEASE_ID),
-                name: assetName,
-                data,
-                headers: { 'content-type': contentType, 'content-length': data.length }
-              });
-              console.log('Uploaded: ' + assetName);
-            }
+            const assetName = `ScreenJournal-Open-Windows-${version}.exe`;
+            const data = fs.readFileSync(filePath);
+            await github.rest.repos.uploadReleaseAsset({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: parseInt(process.env.RELEASE_ID),
+              name: assetName,
+              data,
+              headers: { 'content-type': 'application/x-msdownload', 'content-length': data.length }
+            });
+            console.log('Uploaded: ' + assetName);
 
   # =============================================================================
   # Publish Release (after all builds complete)
