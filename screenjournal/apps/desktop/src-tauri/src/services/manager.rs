@@ -766,6 +766,11 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
     };
     
     if !script_path.exists() {
+        log::error!(
+            "Startup script not found at: {:?} (resource_dir: {:?})",
+            script_path,
+            resource_dir
+        );
         return Err(format!("Startup script not found at: {:?}", script_path));
     }
     
@@ -774,7 +779,9 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
     // Execute the script with environment variables
     let mut cmd = TokioCommand::new(shell_cmd);
     if cfg!(target_os = "windows") {
-        cmd.arg("/c").arg(&script_path);
+        // Quote the path so paths with spaces (e.g. "ScreenJournal Tracker") are passed as one argument to cmd
+        let script_arg = format!("\"{}\"", script_path.display());
+        cmd.arg("/c").arg(script_arg);
     } else {
         cmd.arg(&script_path);
     }
