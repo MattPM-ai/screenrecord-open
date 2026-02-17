@@ -316,7 +316,7 @@ jobs:
       - name: Copy to short path (Windows)
         if: matrix.platform == 'windows-latest'
         run: |
-          New-Item -ItemType Directory -Force -Path C:\r | Out-Null
+          mkdir C:\r 2>nul
           xcopy /E /I /H /Y . C:\r\
         shell: cmd
 
