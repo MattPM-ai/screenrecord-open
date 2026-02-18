@@ -5,7 +5,11 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command as TokioCommand;
+use tokio::sync::oneshot;
 use tokio::time::{sleep, Duration};
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 
 
 // Global state for service processes (Go binaries)
@@ -813,23 +817,27 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
 
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.as_std_mut().creation_flags(CREATE_NO_WINDOW);
+    }
+
     let mut child = cmd.spawn().map_err(|e| {
         format!("Failed to execute startup script: {}", e)
     })?;
     
-    // Read stdout line by line and parse progress
+    // Read stdout line by line and parse progress; signal when script reports "all:ready"
     let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
     let mut reader = BufReader::new(stdout).lines();
+    let (all_ready_tx, all_ready_rx) = oneshot::channel::<()>();
     
-    // Spawn a task to read and parse output
     let app_handle_clone = app_handle.clone();
     tokio::spawn(async move {
         while let Ok(Some(line)) = reader.next_line().await {
             let line = line.trim();
             
-            // Parse progress markers
             if line.starts_with("[PROGRESS]") {
-                // Format: [PROGRESS] service:status
                 let parts: Vec<&str> = line[10..].trim().split(':').collect();
                 if parts.len() == 2 {
                     let service = parts[0].to_string();
@@ -840,11 +848,12 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
                         status: status.clone(),
                         message: None,
                     };
-                    
-                    // Emit event to frontend
                     let _ = app_handle_clone.emit("service-progress", &progress);
-                    
                     log::info!("Service progress: {} -> {}", service, status);
+                    
+                    if service == "all" && status == "ready" {
+                        let _ = all_ready_tx.send(());
+                    }
                 }
             } else if line.starts_with("[STEP]") {
                 log::info!("{}", &line[7..]);
@@ -856,25 +865,28 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
         }
     });
     
-    // Wait for the script to complete
-    let status = child.wait().await.map_err(|e| {
-        format!("Failed to wait for startup script: {}", e)
-    })?;
+    // Keep the script process alive (it runs :keep_alive forever); don't block on wait()
+    let child_handle = child;
+    tokio::spawn(async move {
+        let _ = child_handle.wait().await;
+    });
     
-    if !status.success() {
-        // Read stderr for error details
-        let stderr = child.stderr.take();
-        if let Some(mut stderr) = stderr {
-            use tokio::io::AsyncReadExt;
-            let mut error_output = String::new();
-            let _ = stderr.read_to_string(&mut error_output).await;
-            log::error!("Startup script stderr: {}", error_output);
+    // Return once we see "all:ready" or after timeout; frontend can also advance via status polling
+    const ALL_READY_TIMEOUT_SECS: u64 = 120;
+    match tokio::time::timeout(Duration::from_secs(ALL_READY_TIMEOUT_SECS), all_ready_rx).await {
+        Ok(Ok(())) => {
+            log::info!("All backend services started successfully via script (all:ready received)");
         }
-        
-        return Err(format!("Startup script exited with status: {:?}", status.code()));
-    }
-    
-    log::info!("All backend services started successfully via script");
+        Ok(Err(_)) => {
+            log::warn!("Startup script output channel closed before all:ready");
+        }
+        Err(_) => {
+            log::warn!(
+                "No all:ready from script within {}s; frontend may advance via status polling",
+                ALL_READY_TIMEOUT_SECS
+            );
+        }
+    };
     Ok(())
 }
 
