@@ -277,9 +277,9 @@ jobs:
               echo "    Removed: $1"
             ' -- {} \;
             
-            # Sign all executables in ActivityWatch resources
-            find "$AW_RESOURCES" -type f \( -perm +111 -o -name "*.dylib" \) ! -name ".*" | while read binary; do
-              echo "    Signing: $(basename $binary)"
+            # Sign all executables in ActivityWatch resources (exclude zoneinfo/data files that have +x but are not Mach-O)
+            find "$AW_RESOURCES" -type f \( -perm +111 -o -name "*.dylib" \) ! -name ".*" ! -path "*zoneinfo*" | while read binary; do
+              echo "    Signing: $(basename "$binary")"
               codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" -s "$IDENTITY" "$binary"
             done
             
@@ -297,7 +297,7 @@ jobs:
           if [ -d "$FFMPEG_RESOURCES" ]; then
             echo "  📦 Signing FFmpeg binaries..."
             find "$FFMPEG_RESOURCES" -type f \( -perm +111 -o -name "*.dylib" \) ! -name ".*" | while read binary; do
-              echo "    Signing: $(basename $binary)"
+              echo "    Signing: $(basename "$binary")"
               codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" -s "$IDENTITY" "$binary"
             done
             echo "  ✅ FFmpeg binaries signed"
