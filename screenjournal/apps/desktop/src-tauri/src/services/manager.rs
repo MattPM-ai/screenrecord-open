@@ -857,6 +857,19 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
                         let _ = all_ready_tx.send(());
                         break;
                     }
+                    // On Windows, CMD pipe buffering often prevents "all:ready" from being read.
+                    // When we see the last service (frontend) ready/skipped, emit synthetic all:ready
+                    // so the frontend can advance without waiting for the script's echoed line.
+                    if service == "frontend" && (status == "ready" || status == "skipped") {
+                        let all_progress = ServiceProgress {
+                            service: "all".to_string(),
+                            status: "ready".to_string(),
+                            message: None,
+                        };
+                        let _ = app_handle_clone.emit("service-progress", &all_progress);
+                        let _ = all_ready_tx.send(());
+                        break;
+                    }
                 }
             } else if line.starts_with("[STEP]") {
                 log::info!("{}", &line[7..]);
