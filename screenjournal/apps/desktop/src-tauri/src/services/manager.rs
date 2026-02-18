@@ -7,6 +7,9 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command as TokioCommand;
 use tokio::time::{sleep, Duration};
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 // Global state for service processes (Go binaries)
 type ServiceProcesses = Arc<Mutex<Vec<Child>>>;
 
@@ -796,27 +799,38 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
         app_data_dir_str
     );
 
-    let mut cmd = TokioCommand::new(shell_cmd);
-    if cfg!(target_os = "windows") {
-        // Use path without \\?\ prefix so cmd.exe recognizes it.
-        // Do not add quotes: we pass one argument; Windows keeps it as one (spaces are fine).
+    // On Windows spawn with CREATE_NO_WINDOW so the batch script's console is hidden.
+    let mut child = if cfg!(target_os = "windows") {
         let mut script_path_str = script_path.to_string_lossy().to_string();
         if script_path_str.starts_with(r"\\?\") {
             script_path_str = script_path_str[r"\\?\".len()..].to_string();
         }
-        cmd.arg("/c").arg(&script_path_str);
+        let mut std_cmd = std::process::Command::new(shell_cmd);
+        std_cmd.arg("/c").arg(&script_path_str);
+        std_cmd.env("RESOURCE_DIR", &resource_dir_str);
+        std_cmd.env("APP_DATA_DIR", &app_data_dir_str);
+        std_cmd.current_dir(&app_data_dir);
+        std_cmd.stdout(Stdio::piped());
+        std_cmd.stderr(Stdio::piped());
+        std_cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        let std_child = std_cmd.spawn().map_err(|e| {
+            format!("Failed to execute startup script: {}", e)
+        })?;
+        tokio::process::Child::from_std(std_child).map_err(|e| {
+            format!("Failed to attach to startup script process: {}", e)
+        })?
     } else {
+        let mut cmd = TokioCommand::new(shell_cmd);
         cmd.arg(&script_path);
-    }
-    cmd.env("RESOURCE_DIR", &resource_dir_str);
-    cmd.env("APP_DATA_DIR", &app_data_dir_str);
-    cmd.current_dir(&app_data_dir);
-    cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::piped());
-    
-    let mut child = cmd.spawn().map_err(|e| {
-        format!("Failed to execute startup script: {}", e)
-    })?;
+        cmd.env("RESOURCE_DIR", &resource_dir_str);
+        cmd.env("APP_DATA_DIR", &app_data_dir_str);
+        cmd.current_dir(&app_data_dir);
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
+        cmd.spawn().map_err(|e| {
+            format!("Failed to execute startup script: {}", e)
+        })?
+    };
     
     // Read stdout line by line and parse progress
     let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;

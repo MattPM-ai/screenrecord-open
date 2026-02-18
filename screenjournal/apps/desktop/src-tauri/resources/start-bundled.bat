@@ -305,10 +305,10 @@ if not exist "%FRONTEND_DIR%" (
         set STANDALONE_DIR=%FRONTEND_DIR%\.next\standalone
         if exist "%STANDALONE_DIR%\server.js" (
             echo %STEP_PREFIX% Using Next.js standalone build
-            cd /d "%STANDALONE_DIR%"
             set NODE_ENV=production
             set PORT=3030
-            start /b "" "%NODE_EXE%" server.js > "%APP_DATA_DIR%\frontend.log" 2>&1
+            REM Start Node with hidden window so "next-server" console does not appear
+            powershell -NoProfile -Command "Start-Process -FilePath '%NODE_EXE%' -ArgumentList 'server.js' -WorkingDirectory '%STANDALONE_DIR%' -WindowStyle Hidden -RedirectStandardOutput '%APP_DATA_DIR%\frontend.log' -RedirectStandardError '%APP_DATA_DIR%\frontend.log'"
             
             REM Get PID
             timeout /t 2 /nobreak >nul 2>&1
@@ -319,9 +319,10 @@ if not exist "%FRONTEND_DIR%" (
             echo %STEP_PREFIX% Standalone build not found, trying standard Next.js build
             echo %STEP_PREFIX% Starting Next.js server from: %FRONTEND_DIR%
             echo %STEP_PREFIX% Using Node.js at: %NODE_EXE%
-            cd /d "%FRONTEND_DIR%"
             set NODE_ENV=production
-            start /b "" "%NODE_EXE%" "%NEXT_BIN%" start -p 3030 > "%APP_DATA_DIR%\frontend.log" 2>&1
+            REM Start Next with hidden window so "next-server" console does not appear (use node + next CLI to avoid .cmd console)
+            set NEXT_CLI=%FRONTEND_DIR%\node_modules\next\dist\bin\next
+            powershell -NoProfile -Command "Start-Process -FilePath '%NODE_EXE%' -ArgumentList '%NEXT_CLI%', 'start', '-p', '3030' -WorkingDirectory '%FRONTEND_DIR%' -WindowStyle Hidden -RedirectStandardOutput '%APP_DATA_DIR%\frontend.log' -RedirectStandardError '%APP_DATA_DIR%\frontend.log'"
             
             REM Get PID
             timeout /t 2 /nobreak >nul 2>&1
