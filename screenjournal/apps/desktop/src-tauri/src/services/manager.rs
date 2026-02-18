@@ -774,19 +774,42 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
         return Err(format!("Startup script not found at: {:?}", script_path));
     }
     
-    log::info!("Executing startup script: {:?}", script_path);
-    
-    // Execute the script with environment variables
+    // Use string paths for env vars so Windows gets a clear UTF-8 value (PathBuf/OsStr can be tricky in child env)
+    let mut resource_dir_str = resource_dir.to_string_lossy().to_string();
+    let mut app_data_dir_str = app_data_dir.to_string_lossy().to_string();
+
+    #[cfg(target_os = "windows")]
+    {
+        // cmd.exe and batch scripts do not understand the \\?\ extended-length path prefix.
+        // Strip it so we pass a normal path (e.g. C:\Users\... instead of \\?\C:\Users\...).
+        for s in [&mut resource_dir_str, &mut app_data_dir_str] {
+            if s.starts_with(r"\\?\") {
+                *s = s[r"\\?\".len()..].to_string();
+            }
+        }
+    }
+
+    log::info!(
+        "Executing startup script: {:?} with RESOURCE_DIR={:?} APP_DATA_DIR={:?}",
+        script_path,
+        resource_dir_str,
+        app_data_dir_str
+    );
+
     let mut cmd = TokioCommand::new(shell_cmd);
     if cfg!(target_os = "windows") {
-        // Quote the path so paths with spaces (e.g. "ScreenJournal Tracker") are passed as one argument to cmd
-        let script_arg = format!("\"{}\"", script_path.display());
+        // Use path without \\?\ prefix so cmd.exe recognizes it; quote for spaces
+        let mut script_path_str = script_path.to_string_lossy().to_string();
+        if script_path_str.starts_with(r"\\?\") {
+            script_path_str = script_path_str[r"\\?\".len()..].to_string();
+        }
+        let script_arg = format!("\"{}\"", script_path_str);
         cmd.arg("/c").arg(script_arg);
     } else {
         cmd.arg(&script_path);
     }
-    cmd.env("RESOURCE_DIR", &resource_dir);
-    cmd.env("APP_DATA_DIR", &app_data_dir);
+    cmd.env("RESOURCE_DIR", &resource_dir_str);
+    cmd.env("APP_DATA_DIR", &app_data_dir_str);
     cmd.current_dir(&app_data_dir);
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());

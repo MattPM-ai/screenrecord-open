@@ -3,6 +3,11 @@ REM Bundled service startup script for ScreenJournal Tracker (Windows)
 REM This script starts all services using bundled binaries from the Tauri app
 REM Outputs structured progress messages for the Rust service manager to parse
 
+REM Debug: write env to %TEMP% so we can confirm script ran and what it received (remove in production if desired)
+echo [%date% %time%] start-bundled.bat started >> "%TEMP%\screenjournal-start-bundled-debug.txt"
+echo RESOURCE_DIR=%RESOURCE_DIR% >> "%TEMP%\screenjournal-start-bundled-debug.txt"
+echo APP_DATA_DIR=%APP_DATA_DIR% >> "%TEMP%\screenjournal-start-bundled-debug.txt"
+
 REM Progress markers for parsing
 set PROGRESS_PREFIX=[PROGRESS]
 set ERROR_PREFIX=[ERROR]
