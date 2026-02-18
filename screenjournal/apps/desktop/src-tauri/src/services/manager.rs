@@ -646,7 +646,6 @@ pub async fn start_chat_agent(app_handle: AppHandle) -> Result<(), String> {
     // Spawn task to read and log stderr for debugging
     let stderr = child.stderr.take();
     if let Some(stderr) = stderr {
-        let app_handle_clone = app_handle.clone();
         tokio::spawn(async move {
             let reader = BufReader::new(stderr);
             let mut lines = reader.lines();
@@ -780,19 +779,22 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
     }
     
     // Use string paths for env vars so Windows gets a clear UTF-8 value (PathBuf/OsStr can be tricky in child env)
-    let mut resource_dir_str = resource_dir.to_string_lossy().to_string();
-    let mut app_data_dir_str = app_data_dir.to_string_lossy().to_string();
-
     #[cfg(target_os = "windows")]
-    {
-        // cmd.exe and batch scripts do not understand the \\?\ extended-length path prefix.
-        // Strip it so we pass a normal path (e.g. C:\Users\... instead of \\?\C:\Users\...).
-        for s in [&mut resource_dir_str, &mut app_data_dir_str] {
+    let (resource_dir_str, app_data_dir_str) = {
+        let mut r = resource_dir.to_string_lossy().to_string();
+        let mut a = app_data_dir.to_string_lossy().to_string();
+        for s in [&mut r, &mut a] {
             if s.starts_with(r"\\?\") {
                 *s = s[r"\\?\".len()..].to_string();
             }
         }
-    }
+        (r, a)
+    };
+    #[cfg(not(target_os = "windows"))]
+    let (resource_dir_str, app_data_dir_str) = (
+        resource_dir.to_string_lossy().to_string(),
+        app_data_dir.to_string_lossy().to_string(),
+    );
 
     log::info!(
         "Executing startup script: {:?} with RESOURCE_DIR={:?} APP_DATA_DIR={:?}",
@@ -853,6 +855,7 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
                     
                     if service == "all" && status == "ready" {
                         let _ = all_ready_tx.send(());
+                        break;
                     }
                 }
             } else if line.starts_with("[STEP]") {
@@ -866,7 +869,7 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
     });
     
     // Keep the script process alive (it runs :keep_alive forever); don't block on wait()
-    let child_handle = child;
+    let mut child_handle = child;
     tokio::spawn(async move {
         let _ = child_handle.wait().await;
     });
