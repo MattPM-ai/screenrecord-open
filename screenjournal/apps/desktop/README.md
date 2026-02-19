@@ -176,3 +176,22 @@ The `check-aw` script runs automatically before building to ensure binaries are 
 3. Configure notarization for macOS distribution
 
 See `DISTRIBUTION.md` for detailed information on production distribution and code signing with Developer ID.
+
+## Logs and debugging
+
+The app writes logs to a file so you can diagnose startup or runtime issues (e.g. stuck on "All services ready").
+
+**Log file locations:**
+
+| Platform | Path |
+|----------|------|
+| **Windows** | `%LOCALAPPDATA%\com.screenjournal.tracker\logs\screenjournal-desktop.log` |
+| **macOS** | `~/Library/Logs/com.screenjournal.tracker/screenjournal-desktop.log` |
+| **Linux** | `$XDG_DATA_HOME/com.screenjournal.tracker/logs/screenjournal-desktop.log` (or `~/.local/share/...`) |
+
+**What to look for when the loading screen is stuck:**
+
+- `Service progress: mongodb -> ready`, `influxdb -> ready`, … — the startup script is reporting progress; if you see these but never `all -> ready`, the script’s "all:ready" line may be buffered (common on Windows).
+- `All backend services started successfully via script (all:ready received)` — the Rust side received the all-ready signal.
+- `No all:ready from script within 120s` — the script never sent all:ready in time; the UI should still advance via status polling or the "all state ready" fallback.
+- Any `[ERROR]` or failed health checks — a service may not be starting correctly.

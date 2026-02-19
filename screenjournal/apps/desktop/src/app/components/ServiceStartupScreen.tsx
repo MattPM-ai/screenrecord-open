@@ -11,7 +11,7 @@
  * ============================================================================
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getAllServicesStatus, type AllServicesStatus } from "@/lib/servicesClient";
 import { CheckCircle2, Loader2, XCircle, AlertCircle } from "lucide-react";
 import { cn } from "@repo/ui";
@@ -56,12 +56,16 @@ export function ServiceStartupScreen({
   );
   const [startTime] = useState(Date.now());
   const [overallStatus, setOverallStatus] = useState<"starting" | "ready" | "timeout">("starting");
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     let pollInterval: NodeJS.Timeout;
     let timeout: NodeJS.Timeout;
     let mounted = true;
     let unlistenProgress: (() => void) | null = null;
+    pollIntervalRef.current = null;
+    timeoutRef.current = null;
 
     // Listen for progress events from the startup script
     listen<{ service: string; status: string; message?: string }>(
@@ -102,6 +106,8 @@ export function ServiceStartupScreen({
         // If all services are ready, trigger onReady
         if (service === "all" && status === "ready") {
           setOverallStatus("ready");
+          pollIntervalRef.current = null;
+          timeoutRef.current = null;
           clearInterval(pollInterval);
           clearTimeout(timeout);
           setTimeout(() => {
@@ -165,6 +171,8 @@ export function ServiceStartupScreen({
 
         if (allReady && overallStatus === "starting") {
           setOverallStatus("ready");
+          pollIntervalRef.current = null;
+          timeoutRef.current = null;
           clearInterval(pollInterval);
           clearTimeout(timeout);
           setTimeout(() => {
@@ -181,6 +189,7 @@ export function ServiceStartupScreen({
 
     // Start polling (as fallback)
     pollInterval = setInterval(checkServices, POLL_INTERVAL_MS);
+    pollIntervalRef.current = pollInterval;
     checkServices(); // Initial check
 
     // Set timeout
@@ -201,6 +210,7 @@ export function ServiceStartupScreen({
         });
       }
     }, MAX_WAIT_TIME_MS);
+    timeoutRef.current = timeout;
 
     return () => {
       mounted = false;
@@ -209,6 +219,24 @@ export function ServiceStartupScreen({
       unlistenProgress?.();
     };
   }, [onReady, onError, overallStatus]);
+
+  // Fallback: if UI state shows all services ready but we never got "all:ready" event (e.g. Windows pipe buffering), advance
+  useEffect(() => {
+    if (overallStatus !== "starting") return;
+    const allReadyInState = services.every((s) => s.status === "ready");
+    if (!allReadyInState) return;
+    setOverallStatus("ready");
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    const t = setTimeout(() => onReady(), 500);
+    return () => clearTimeout(t);
+  }, [services, overallStatus, onReady]);
 
   const allReady = services.every((s) => s.status === "ready");
   const hasFailures = services.some((s) => s.status === "failed");

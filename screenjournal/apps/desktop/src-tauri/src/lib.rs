@@ -67,10 +67,16 @@ pub fn run() {
                 log::LevelFilter::Info
             };
             
+            use tauri_plugin_log::{Target, TargetKind};
             app.handle().plugin(
                 tauri_plugin_log::Builder::default()
                     .level(log_level)
-                    // Set specific levels for modules
+                    // Write logs to app data dir for debugging (e.g. startup stuck on "all services ready")
+                    // Windows: %APPDATA%\com.screenjournal.tracker\logs\screenjournal-desktop.log
+                    // macOS: ~/Library/Logs/com.screenjournal.tracker/screenjournal-desktop.log
+                    .target(Target::new(TargetKind::LogDir {
+                        file_name: Some("screenjournal-desktop".into()),
+                    }))
                     .level_for("app_lib::services", log::LevelFilter::Info) // Always show service logs
                     .level_for("app_lib::collector", log::LevelFilter::Warn)
                     .level_for("app_lib::activitywatch", log::LevelFilter::Warn)
