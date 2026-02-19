@@ -74,6 +74,7 @@ export function ServiceStartupScreen({
         if (!mounted) return;
 
         const { service, status, message } = event.payload;
+        console.log("[ServiceStartupScreen] Received service-progress event:", { service, status, message });
 
         setServices((prev) =>
           prev.map((s) => {
@@ -105,6 +106,7 @@ export function ServiceStartupScreen({
 
         // If all services are ready, trigger onReady
         if (service === "all" && status === "ready") {
+          console.log("[ServiceStartupScreen] Received all:ready event, calling onReady()");
           setOverallStatus("ready");
           pollIntervalRef.current = null;
           timeoutRef.current = null;
@@ -112,6 +114,7 @@ export function ServiceStartupScreen({
           clearTimeout(timeout);
           setTimeout(() => {
             if (mounted) {
+              console.log("[ServiceStartupScreen] Executing onReady() callback");
               onReady();
             }
           }, 500);
@@ -170,6 +173,7 @@ export function ServiceStartupScreen({
         });
 
         if (allReady && overallStatus === "starting") {
+          console.log("[ServiceStartupScreen] Poll detected all services ready, calling onReady()");
           setOverallStatus("ready");
           pollIntervalRef.current = null;
           timeoutRef.current = null;
@@ -177,6 +181,7 @@ export function ServiceStartupScreen({
           clearTimeout(timeout);
           setTimeout(() => {
             if (mounted) {
+              console.log("[ServiceStartupScreen] Executing onReady() callback from poll");
               onReady();
             }
           }, 500);
@@ -222,9 +227,21 @@ export function ServiceStartupScreen({
 
   // Fallback: if UI state shows all services ready but we never got "all:ready" event (e.g. Windows pipe buffering), advance
   useEffect(() => {
-    if (overallStatus !== "starting") return;
+    console.log("[ServiceStartupScreen] Fallback check:", {
+      overallStatus,
+      servicesStatuses: services.map((s) => ({ name: s.name, status: s.status })),
+      allReady: services.every((s) => s.status === "ready"),
+    });
+    if (overallStatus !== "starting") {
+      console.log("[ServiceStartupScreen] Fallback skipped: overallStatus is", overallStatus);
+      return;
+    }
     const allReadyInState = services.every((s) => s.status === "ready");
-    if (!allReadyInState) return;
+    if (!allReadyInState) {
+      console.log("[ServiceStartupScreen] Fallback skipped: not all services ready");
+      return;
+    }
+    console.log("[ServiceStartupScreen] Fallback triggered: all services ready, calling onReady()");
     setOverallStatus("ready");
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current);

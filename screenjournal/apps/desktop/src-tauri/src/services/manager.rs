@@ -850,10 +850,11 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
                         status: status.clone(),
                         message: None,
                     };
-                    let _ = app_handle_clone.emit("service-progress", &progress);
-                    log::info!("Service progress: {} -> {}", service, status);
+                    let emit_result = app_handle_clone.emit("service-progress", &progress);
+                    log::info!("Service progress: {} -> {} (emit result: {:?})", service, status, emit_result);
                     
                     if service == "all" && status == "ready" {
+                        log::info!("Received all:ready, sending on oneshot channel and breaking");
                         let _ = all_ready_tx.send(());
                         break;
                     }
@@ -892,6 +893,15 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
     match tokio::time::timeout(Duration::from_secs(ALL_READY_TIMEOUT_SECS), all_ready_rx).await {
         Ok(Ok(())) => {
             log::info!("All backend services started successfully via script (all:ready received)");
+            // Ensure the frontend receives the all:ready event even if we already sent on oneshot
+            // (e.g. from synthetic frontend:ready -> all:ready emission)
+            let all_progress = ServiceProgress {
+                service: "all".to_string(),
+                status: "ready".to_string(),
+                message: None,
+            };
+            let emit_result = app_handle.emit("service-progress", &all_progress);
+            log::info!("Emitted all:ready event after oneshot received (emit result: {:?})", emit_result);
         }
         Ok(Err(_)) => {
             log::warn!("Startup script output channel closed before all:ready");
