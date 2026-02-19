@@ -1,6 +1,7 @@
 use crate::services::types::{AllServicesStatus, ServiceProgress, ServiceStatus};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -23,6 +24,10 @@ static SERVICE_PROCESSES: once_cell::sync::Lazy<ServiceProcesses> =
 
 static PYTHON_PROCESSES: once_cell::sync::Lazy<PythonProcesses> =
     once_cell::sync::Lazy::new(|| Arc::new(Mutex::new(Vec::new())));
+
+/// Set to true when the startup script has reported all:ready. Frontend can poll this
+/// via did_services_startup_complete() when event delivery is unreliable (e.g. Windows).
+static STARTUP_ALL_READY: AtomicBool = AtomicBool::new(false);
 
 /// Get the resource directory path for bundled resources
 fn get_resource_dir(app_handle: &AppHandle) -> Result<PathBuf, String> {
@@ -855,6 +860,7 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
                     
                     if service == "all" && status == "ready" {
                         log::info!("Received all:ready, sending on oneshot channel and breaking");
+                        STARTUP_ALL_READY.store(true, Ordering::SeqCst);
                         let _ = all_ready_tx.send(());
                         break;
                     }
@@ -862,6 +868,7 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
                     // When we see the last service (frontend) ready/skipped, emit synthetic all:ready
                     // so the frontend can advance without waiting for the script's echoed line.
                     if service == "frontend" && (status == "ready" || status == "skipped") {
+                        STARTUP_ALL_READY.store(true, Ordering::SeqCst);
                         let all_progress = ServiceProgress {
                             service: "all".to_string(),
                             status: "ready".to_string(),
@@ -892,6 +899,7 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
     const ALL_READY_TIMEOUT_SECS: u64 = 120;
     match tokio::time::timeout(Duration::from_secs(ALL_READY_TIMEOUT_SECS), all_ready_rx).await {
         Ok(Ok(())) => {
+            STARTUP_ALL_READY.store(true, Ordering::SeqCst);
             log::info!("All backend services started successfully via script (all:ready received)");
             // Ensure the frontend receives the all:ready event even if we already sent on oneshot
             // (e.g. from synthetic frontend:ready -> all:ready emission)
@@ -996,6 +1004,13 @@ pub async fn get_all_services_status(_app_handle: AppHandle) -> Result<AllServic
         chat_agent: chat_agent_status,
         frontend: frontend_status,
     })
+}
+
+/// Returns true once the startup script has reported all:ready. The frontend polls this
+/// so it can advance even when the service-progress event is not delivered (e.g. on Windows).
+#[tauri::command]
+pub fn did_services_startup_complete() -> bool {
+    STARTUP_ALL_READY.load(Ordering::SeqCst)
 }
 
 async fn check_database_status(name: &str, port: u16) -> ServiceStatus {

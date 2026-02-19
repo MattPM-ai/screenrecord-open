@@ -57,6 +57,7 @@ pub fn run() {
             crate::collector::manager::trigger_daily_collection,
             // Backend services management
             crate::services::manager::get_all_services_status,
+            crate::services::manager::did_services_startup_complete,
         ])
         .setup(|app| {
             // Enable logging in both debug and release modes

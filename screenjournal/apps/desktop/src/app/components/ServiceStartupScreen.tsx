@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { getAllServicesStatus, type AllServicesStatus } from "@/lib/servicesClient";
+import { getAllServicesStatus, didServicesStartupComplete, type AllServicesStatus } from "@/lib/servicesClient";
 import { CheckCircle2, Loader2, XCircle, AlertCircle } from "lucide-react";
 import { cn } from "@repo/ui";
 import { listen } from "@tauri-apps/api/event";
@@ -128,6 +128,21 @@ export function ServiceStartupScreen({
       if (!mounted) return;
       
       try {
+        // Poll completion flag first (reliable when events don't reach webview, e.g. Windows + CREATE_NO_WINDOW)
+        const startupComplete = await didServicesStartupComplete();
+        if (startupComplete && overallStatus === "starting") {
+          console.log("[ServiceStartupScreen] did_services_startup_complete=true, calling onReady()");
+          setOverallStatus("ready");
+          pollIntervalRef.current = null;
+          timeoutRef.current = null;
+          clearInterval(pollInterval);
+          clearTimeout(timeout);
+          setTimeout(() => {
+            if (mounted) onReady();
+          }, 500);
+          return;
+        }
+
         const status = await getAllServicesStatus();
 
         if (!mounted) return;

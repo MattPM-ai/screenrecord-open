@@ -50,6 +50,14 @@ export async function getAllServicesStatus(): Promise<AllServicesStatus> {
   }
 }
 
+/**
+ * Returns true once the startup script has reported all:ready. Use in the loading screen
+ * poll so the app can advance even when the service-progress event is not delivered (e.g. Windows).
+ */
+export async function didServicesStartupComplete(): Promise<boolean> {
+  return invoke<boolean>('did_services_startup_complete');
+}
+
 
 
 
