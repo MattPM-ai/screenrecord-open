@@ -7,6 +7,9 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command as TokioCommand;
 use tokio::time::{sleep, Duration};
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 // Global state for service processes (Go binaries)
 type ServiceProcesses = Arc<Mutex<Vec<Child>>>;
 
@@ -813,7 +816,13 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
     cmd.current_dir(&app_data_dir);
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
-    
+
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.as_std_mut().creation_flags(CREATE_NO_WINDOW);
+    }
+
     let mut child = cmd.spawn().map_err(|e| {
         format!("Failed to execute startup script: {}", e)
     })?;
