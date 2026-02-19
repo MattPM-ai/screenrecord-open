@@ -798,13 +798,13 @@ pub async fn start_all_services(app_handle: AppHandle) -> Result<(), String> {
 
     let mut cmd = TokioCommand::new(shell_cmd);
     if cfg!(target_os = "windows") {
-        // Use path without \\?\ prefix so cmd.exe recognizes it; quote for spaces
+        // Use path without \\?\ prefix so cmd.exe recognizes it.
+        // Do not add quotes: we pass one argument; Windows keeps it as one (spaces are fine).
         let mut script_path_str = script_path.to_string_lossy().to_string();
         if script_path_str.starts_with(r"\\?\") {
             script_path_str = script_path_str[r"\\?\".len()..].to_string();
         }
-        let script_arg = format!("\"{}\"", script_path_str);
-        cmd.arg("/c").arg(script_arg);
+        cmd.arg("/c").arg(&script_path_str);
     } else {
         cmd.arg(&script_path);
     }
