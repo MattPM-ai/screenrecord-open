@@ -2,6 +2,8 @@ package services
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sj-tracker-report/internal/database"
 	"sj-tracker-report/internal/models"
 	"sj-tracker-report/internal/utils"
@@ -24,6 +26,33 @@ func NewReportService(dataService *DataService, aiService *AIService, mongoClien
 		aiService:   aiService,
 		mongoClient: mongoClient,
 	}
+}
+
+// resolveGeminiAPIKey returns the Gemini API key to use: request key, then GEMINI_API_KEY env, then
+// gemini_api_key.txt in APP_DATA_DIR (or current working directory). Used so the report backend
+// can use the same key the desktop app stores when the frontend does not send one (e.g. report form
+// localStorage not synced with desktop Settings on Windows).
+func resolveGeminiAPIKey(requestKey string) string {
+	s := strings.TrimSpace(requestKey)
+	if s != "" {
+		return s
+	}
+	if s = strings.TrimSpace(os.Getenv("GEMINI_API_KEY")); s != "" {
+		return s
+	}
+	dir := os.Getenv("APP_DATA_DIR")
+	if dir == "" {
+		dir, _ = os.Getwd()
+	}
+	if dir == "" {
+		return ""
+	}
+	path := filepath.Join(dir, "gemini_api_key.txt")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
 }
 
 // GetCachedReport retrieves a cached report without generating a new one
@@ -89,6 +118,9 @@ func (s *ReportService) GenerateReport(request models.GenerateReportRequest) (*m
 	// Add one day to endDate to include the full end date
 	endDate = endDate.Add(24 * time.Hour)
 
+	// Resolve Gemini API key (request body, then env, then app data file for desktop/bundled use)
+	geminiKey := resolveGeminiAPIKey(request.GeminiAPIKey)
+
 	// Build report for all users
 	var allUsers []models.User
 
@@ -117,7 +149,7 @@ func (s *ReportService) GenerateReport(request models.GenerateReportRequest) (*m
 
 		// Use AI to enhance this user's report
 		rawDataContext := s.dataService.AggregateDataForAI(afkData, windowData, appData, metricsData, timelineData)
-		err = s.aiService.EnhanceUserReportWithAI(request.GeminiAPIKey, &userReport, rawDataContext, request, userReq.Name)
+		err = s.aiService.EnhanceUserReportWithAI(geminiKey, &userReport, rawDataContext, request, userReq.Name)
 		if err != nil {
 			// Log error but don't fail - we still have a valid report structure
 			fmt.Printf("WARNING: Failed to enhance report with AI for user %s (ID: %d): %v\n", userReq.Name, userReq.ID, err)
@@ -138,7 +170,7 @@ func (s *ReportService) GenerateReport(request models.GenerateReportRequest) (*m
 		org.UserRanking = userRanking
 
 		// Enhance rankings with AI-generated insights
-		err = s.aiService.EnhanceRankingsWithAI(request.GeminiAPIKey, userRanking, allUsers, request)
+		err = s.aiService.EnhanceRankingsWithAI(geminiKey, userRanking, allUsers, request)
 		if err != nil {
 			// Log error but don't fail - rankings are still valid
 			fmt.Printf("WARNING: Failed to enhance rankings with AI: %v\n", err)
@@ -225,6 +257,9 @@ func (s *ReportService) GenerateWeeklyReport(request models.GenerateWeeklyReport
 		endDate = endDate.Add(24 * time.Hour)
 	}
 
+	// Resolve Gemini API key (request body, then env, then app data file for desktop/bundled use)
+	geminiKey := resolveGeminiAPIKey(request.GeminiAPIKey)
+
 	// Aggregate data across ALL users for organization-level analysis
 	var allUsersData []models.User
 	var allRawDataContexts []string
@@ -237,7 +272,7 @@ func (s *ReportService) GenerateWeeklyReport(request models.GenerateWeeklyReport
 		OrgID:        request.OrgID,
 		StartDate:    startDateStr,
 		EndDate:      endDateStr,
-		GeminiAPIKey: request.GeminiAPIKey,
+		GeminiAPIKey: geminiKey,
 	}
 
 	// Collect data from all users (for structure) but we'll generate org-level summaries
@@ -283,7 +318,7 @@ func (s *ReportService) GenerateWeeklyReport(request models.GenerateWeeklyReport
 		org.UserRanking = userRanking
 
 		// Enhance rankings with AI-generated insights
-		err = s.aiService.EnhanceRankingsWithAI(request.GeminiAPIKey, userRanking, allUsersData, tempRequest)
+		err = s.aiService.EnhanceRankingsWithAI(geminiKey, userRanking, allUsersData, tempRequest)
 		if err != nil {
 			// Log error but don't fail - rankings are still valid
 			fmt.Printf("WARNING: Failed to enhance rankings with AI: %v\n", err)
@@ -307,7 +342,7 @@ func (s *ReportService) GenerateWeeklyReport(request models.GenerateWeeklyReport
 
 	// Generate AI-enhanced summaries
 	combinedRawDataContext := strings.Join(allRawDataContexts, "\n\n--- USER SEPARATOR ---\n\n")
-	err = s.aiService.EnhanceWeeklyReportSummaries(request.GeminiAPIKey, report, weeklySummary, weeklyUserSummaries, combinedRawDataContext, request, startDateStr, endDateStr)
+	err = s.aiService.EnhanceWeeklyReportSummaries(geminiKey, report, weeklySummary, weeklyUserSummaries, combinedRawDataContext, request, startDateStr, endDateStr)
 	if err != nil {
 		// Log error but don't fail - we still have a valid report structure
 		fmt.Printf("WARNING: Failed to enhance weekly report summaries with AI: %v\n", err)

@@ -14,7 +14,7 @@ type GenerateReportRequest struct {
 	OrgID        int           `json:"orgId"` // Allow 0 for local version
 	StartDate    string        `json:"startDate" binding:"required"` // YYYY-MM-DD
 	EndDate      string        `json:"endDate" binding:"required"`   // YYYY-MM-DD
-	GeminiAPIKey string        `json:"geminiApiKey" binding:"required"` // User's Gemini API key
+	GeminiAPIKey string        `json:"geminiApiKey"` // User's Gemini API key (optional; backend may fall back to env or app data file)
 }
 
 // TaskResponse represents the response when creating a task
@@ -30,7 +30,7 @@ type GenerateWeeklyReportRequest struct {
 	Org          string        `json:"org" binding:"required"`
 	OrgID        int           `json:"orgId"` // Allow 0 for local version
 	WeekStartDate string       `json:"weekStartDate" binding:"required"` // YYYY-MM-DD - Monday of the week (or start date if custom period)
-	GeminiAPIKey  string       `json:"geminiApiKey" binding:"required"` // User's Gemini API key
+	GeminiAPIKey  string       `json:"geminiApiKey"` // User's Gemini API key (optional; backend may fall back to env or app data file)
 	// Optional: Custom start/end dates for exact period (overrides Monday-Sunday calculation)
 	CustomStartDate *string `json:"customStartDate,omitempty"` // ISO 8601 datetime (e.g., "2025-12-01T16:30:00Z")
 	CustomEndDate   *string `json:"customEndDate,omitempty"`   // ISO 8601 datetime (e.g., "2025-12-08T16:30:00Z")
