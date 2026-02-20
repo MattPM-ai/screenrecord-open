@@ -38,6 +38,9 @@ use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
@@ -216,12 +219,14 @@ pub fn check_ffmpeg() -> Result<(), String> {
         ));
     }
     
-    // Try to run it
-    Command::new(&ffmpeg_path)
-        .arg("-version")
+    // Try to run it (no console window on Windows)
+    let mut cmd = Command::new(&ffmpeg_path);
+    cmd.arg("-version")
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
+        .stderr(Stdio::null());
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    cmd.status()
         .map_err(|e| format!("FFmpeg failed to execute: {}. Path: {:?}", e, ffmpeg_path))?;
     
     log::info!("FFmpeg check passed: {:?}", ffmpeg_path);
@@ -522,27 +527,29 @@ fn spawn_ffmpeg(
     );
     log::info!("FFmpeg binary: {:?}", ffmpeg_path);
     
-    Command::new(&ffmpeg_path)
-        .args([
-            "-y",                           // Overwrite output
-            "-f", "rawvideo",               // Input format
-            "-pix_fmt", "bgra",             // Input pixel format
-            "-s", &format!("{}x{}", width, height),  // Input size
-            "-r", &fps.to_string(),         // Input framerate
-            "-i", "pipe:0",                 // Read from stdin
-            "-vf", &scale_filter,           // Scale and letterbox/pillarbox filter
-            "-c:v", "libx264",              // H.264 codec
-            "-preset", preset,              // Encoding preset (configurable)
-            "-crf", &crf.to_string(),       // Quality (configurable)
-            "-tune", "stillimage",          // Optimized for screen content
-            "-pix_fmt", "yuv420p",          // Output pixel format (MP4 compatibility)
-            "-movflags", "+faststart",      // Enable streaming
-        ])
-        .arg(output_path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())              // Discard stderr to prevent buffer blocking
-        .spawn()
+    let mut cmd = Command::new(&ffmpeg_path);
+    cmd.args([
+        "-y",                           // Overwrite output
+        "-f", "rawvideo",               // Input format
+        "-pix_fmt", "bgra",             // Input pixel format
+        "-s", &format!("{}x{}", width, height),  // Input size
+        "-r", &fps.to_string(),         // Input framerate
+        "-i", "pipe:0",                 // Read from stdin
+        "-vf", &scale_filter,           // Scale and letterbox/pillarbox filter
+        "-c:v", "libx264",              // H.264 codec
+        "-preset", preset,              // Encoding preset (configurable)
+        "-crf", &crf.to_string(),       // Quality (configurable)
+        "-tune", "stillimage",          // Optimized for screen content
+        "-pix_fmt", "yuv420p",          // Output pixel format (MP4 compatibility)
+        "-movflags", "+faststart",      // Enable streaming
+    ])
+    .arg(output_path)
+    .stdin(Stdio::piped())
+    .stdout(Stdio::null())
+    .stderr(Stdio::null());             // Discard stderr to prevent buffer blocking
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000);     // CREATE_NO_WINDOW
+    cmd.spawn()
         .map_err(|e| format!("Failed to spawn FFmpeg at {:?}: {}", ffmpeg_path, e))
 }
 

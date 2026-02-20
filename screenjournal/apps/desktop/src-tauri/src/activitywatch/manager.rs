@@ -8,6 +8,9 @@ use std::{
     time::Duration,
 };
 use sysinfo::{System, Pid};
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use tauri::{AppHandle, Manager};
 
 static AW_CHILD: Lazy<Mutex<Option<Child>>> = Lazy::new(|| Mutex::new(None));
@@ -302,7 +305,8 @@ fn ensure_watchers_running(app: &AppHandle, port: u16) -> Result<Vec<String>, St
                     .stdin(Stdio::null())
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped());
-                
+                #[cfg(target_os = "windows")]
+                cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
                 match cmd.spawn() {
                     Ok(child) => {
                         log::info!("Started watcher {} (PID: {:?})", watcher_name, child.id());
@@ -510,6 +514,8 @@ fn start_server_internal(
             // Activity watch debug logs argument
             // .arg("--verbose")
             .stdin(Stdio::null());
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
 
         log::info!("spawning aw-server at {}", bin_path.display());
         let child = cmd.spawn().map_err(|e| {
@@ -666,6 +672,8 @@ pub async fn start_watcher(app: AppHandle, watcher_name: String) -> Result<(), S
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
 
     match cmd.spawn() {
         Ok(child) => {

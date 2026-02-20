@@ -17,6 +17,9 @@ use crate::recording::capture::get_ffmpeg_path;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 /**
  * Mix audio files into a single MP4 (AAC in MP4 container)
  * 
@@ -73,8 +76,9 @@ pub fn mix_audio_to_mp4(
         let mic_p = mic_audio_path.unwrap();
         log::info!("[AUDIO-MIX] Using amix filter to combine system audio and mic audio");
         
-        Command::new(&ffmpeg_path)
-            .args([
+        (|| {
+            let mut c = Command::new(&ffmpeg_path);
+            c.args([
                 "-y",                                                   // Overwrite output
                 "-i", system_audio_path.to_str().unwrap(),             // Input 0: System audio
                 "-i", mic_p.to_str().unwrap(),                         // Input 1: Mic audio
@@ -84,39 +88,50 @@ pub fn mix_audio_to_mp4(
                 "-b:a", &bitrate_arg,                                  // Bitrate
                 "-movflags", "+faststart",                             // Enable streaming
             ])
-            .arg(output_path)
-            .output()
+            .arg(output_path);
+            #[cfg(target_os = "windows")]
+            c.creation_flags(0x08000000); // CREATE_NO_WINDOW
+            c.output()
+        })()
             .map_err(|e| format!("Failed to run FFmpeg mix: {}", e))?
     } else if has_system {
         // System audio only
         log::info!("[AUDIO-MIX] Converting system audio only to MP4");
         
-        Command::new(&ffmpeg_path)
-            .args([
+        (|| {
+            let mut c = Command::new(&ffmpeg_path);
+            c.args([
                 "-y",                                                   // Overwrite output
                 "-i", system_audio_path.to_str().unwrap(),             // Input: System audio
                 "-c:a", "aac",                                         // AAC codec
                 "-b:a", &bitrate_arg,                                  // Bitrate
                 "-movflags", "+faststart",                             // Enable streaming
             ])
-            .arg(output_path)
-            .output()
+            .arg(output_path);
+            #[cfg(target_os = "windows")]
+            c.creation_flags(0x08000000); // CREATE_NO_WINDOW
+            c.output()
+        })()
             .map_err(|e| format!("Failed to run FFmpeg convert: {}", e))?
     } else {
         // Mic audio only
         let mic_p = mic_audio_path.unwrap();
         log::info!("[AUDIO-MIX] Converting mic audio only to MP4");
         
-        Command::new(&ffmpeg_path)
-            .args([
+        (|| {
+            let mut c = Command::new(&ffmpeg_path);
+            c.args([
                 "-y",                                                   // Overwrite output
                 "-i", mic_p.to_str().unwrap(),                         // Input: Mic audio
                 "-c:a", "aac",                                         // AAC codec
                 "-b:a", &bitrate_arg,                                  // Bitrate
                 "-movflags", "+faststart",                             // Enable streaming
             ])
-            .arg(output_path)
-            .output()
+            .arg(output_path);
+            #[cfg(target_os = "windows")]
+            c.creation_flags(0x08000000); // CREATE_NO_WINDOW
+            c.output()
+        })()
             .map_err(|e| format!("Failed to run FFmpeg convert: {}", e))?
     };
     
