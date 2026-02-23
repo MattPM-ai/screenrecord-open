@@ -6,7 +6,7 @@
  * PURPOSE: HTTP client for Google Gemini AI video analysis
  * 
  * API ENDPOINT:
- * POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent
+ * POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
  * 
  * REQUEST FLOW:
  * 1. Read video file as bytes
@@ -33,7 +33,7 @@ use std::time::Duration;
 const GEMINI_API_BASE: &str = "https://generativelanguage.googleapis.com/v1beta/models";
 
 /// Model to use for video analysis
-const GEMINI_MODEL: &str = "gemini-2.5-flash-lite";
+const GEMINI_MODEL: &str = "gemini-2.5-flash";
 
 /// Request timeout (video upload can take time)
 const REQUEST_TIMEOUT_SECS: u64 = 300; // 5 minutes
@@ -547,7 +547,7 @@ mod tests {
     #[test]
     fn test_parse_retry_delay_from_real_error() {
         // Real error message from logs
-        let message = "Gemini API error (429): You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash-lite\nPlease retry in 58.731525401s.";
+        let message = "Gemini API error (429): You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 58.731525401s.";
         let result = parse_retry_delay_from_error(message, 120);
         assert!(result.is_some());
         let duration = result.unwrap();

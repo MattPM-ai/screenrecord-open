@@ -16,6 +16,10 @@ import (
 	"time"
 )
 
+// defaultGeminiModel is the Gemini model used for report AI when config does not specify one.
+// Use a stable model supported by generateContent (v1beta).
+const defaultGeminiModel = "gemini-2.5-flash"
+
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -205,7 +209,7 @@ func callGeminiAPI(apiKey string, model string, systemPrompt string, userPrompt 
 	
 	// Default model if not specified
 	if model == "" {
-		model = "gemini-2.0-flash-exp"
+		model = defaultGeminiModel
 	}
 	
 	// Default max tokens
@@ -296,10 +300,10 @@ func (s *AIService) GenerateReport(apiKey string, dataContext string, request mo
 		maxTokens = 8192
 	}
 	
-	// Use Gemini model (default to gemini-2.0-flash-exp)
+	// Use Gemini model (default to defaultGeminiModel)
 	model := s.config.Model
 	if model == "" || strings.HasPrefix(model, "gpt-") {
-		model = "gemini-2.0-flash-exp"
+		model = defaultGeminiModel
 	}
 	
 	// Build full prompt with JSON requirement
@@ -562,7 +566,7 @@ IMPORTANT:
 	// Call Gemini API
 	model := s.config.Model
 	if model == "" || strings.HasPrefix(model, "gpt-") {
-		model = "gemini-2.0-flash-exp"
+		model = defaultGeminiModel
 	}
 	
 	systemPrompt := "You are a productivity analyst. Generate concise, professional summaries and identify discrepancies in work activity data."
@@ -829,7 +833,7 @@ IMPORTANT:
 	// Call Gemini API
 	model := s.config.Model
 	if model == "" || strings.HasPrefix(model, "gpt-") {
-		model = "gemini-2.0-flash-exp"
+		model = defaultGeminiModel
 	}
 	
 	systemPrompt := "You are a productivity analyst. Generate concise, professional summaries and identify discrepancies in work activity data."
@@ -1096,7 +1100,7 @@ IMPORTANT:
 	// Call Gemini API
 	model := s.config.Model
 	if model == "" || strings.HasPrefix(model, "gpt-") {
-		model = "gemini-2.0-flash-exp"
+		model = defaultGeminiModel
 	}
 	
 	systemPrompt := "You are a productivity analyst generating weekly organizational reports. Generate concise, professional summaries and identify discrepancies in work activity data for weekly email delivery to organization management."
@@ -1294,7 +1298,7 @@ IMPORTANT:
 	// Call Gemini API
 	model := s.config.Model
 	if model == "" || strings.HasPrefix(model, "gpt-") {
-		model = "gemini-2.0-flash-exp"
+		model = defaultGeminiModel
 	}
 	
 	systemPrompt := "You are a productivity analyst generating weekly organizational reports for email delivery to organization management. Generate concise, professional organization-level summaries and insights."
@@ -1466,7 +1470,7 @@ RESPOND WITH ONLY JSON in this exact format:
 	// Call Gemini API
 	model := s.config.Model
 	if model == "" || strings.HasPrefix(model, "gpt-") {
-		model = "gemini-2.0-flash-exp"
+		model = defaultGeminiModel
 	}
 	
 	systemPrompt := "You are a productivity analyst generating weekly organizational reports for email delivery to organization management. Generate concise, professional summaries focusing on actionable insights."
@@ -1730,7 +1734,7 @@ IMPORTANT:
 	// Call Gemini API
 	model := s.config.Model
 	if model == "" || strings.HasPrefix(model, "gpt-") {
-		model = "gemini-2.0-flash-exp"
+		model = defaultGeminiModel
 	}
 	
 	systemPrompt := "You are a productivity analyst providing comparative insights on user performance rankings. Always return valid JSON."
