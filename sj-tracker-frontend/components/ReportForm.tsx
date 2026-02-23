@@ -17,6 +17,7 @@
 
 import { useState, FormEvent, useEffect } from 'react'
 import { getDefaultUser, getDefaultOrganisation, type Organisation, type OrganisationUser } from '@/lib/localTypes'
+import { getGeminiKeyStatus, getGeminiKey, saveGeminiKey } from '@/lib/geminiApiKey'
 
 const GEMINI_API_KEY_STORAGE_KEY = 'gemini_api_key'
 
@@ -50,6 +51,7 @@ export default function ReportForm({ onSubmit }: ReportFormProps) {
   const [apiKey, setApiKey] = useState<string>('')
   const [showApiKeyInput, setShowApiKeyInput] = useState(false)
   const [apiKeyError, setApiKeyError] = useState<string>('')
+  const [keyFromBackend, setKeyFromBackend] = useState(false)
 
   // Load user profile and organizations
   useEffect(() => {
@@ -90,14 +92,28 @@ export default function ReportForm({ onSubmit }: ReportFormProps) {
 
     loadData()
 
-    // Load API key from localStorage
-    const storedApiKey = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY)
-    if (storedApiKey) {
-      setApiKey(storedApiKey)
-    } else {
-      // Show API key input if not set
-      setShowApiKeyInput(true)
+    // Load API key: prefer shared backend (sync with desktop app), then localStorage
+    const loadKey = async () => {
+      try {
+        const { set } = await getGeminiKeyStatus()
+        if (set) {
+          setKeyFromBackend(true)
+          setApiKey('')
+          setShowApiKeyInput(false)
+          return
+        }
+      } catch {
+        // Backend not available, fall back to localStorage
+      }
+      const storedApiKey = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY)
+      if (storedApiKey) {
+        setApiKey(storedApiKey)
+        setShowApiKeyInput(false)
+      } else {
+        setShowApiKeyInput(true)
+      }
     }
+    loadKey()
   }, [])
 
   // For local version, use default user instead of loading from API
@@ -138,10 +154,15 @@ export default function ReportForm({ onSubmit }: ReportFormProps) {
       return
     }
 
-    // Get Gemini API key from localStorage (same key used by Chat component)
-    const geminiApiKey = localStorage.getItem('gemini_api_key') || ''
+    // Use shared key from backend (same as desktop app), or from form/localStorage
+    let geminiApiKey = ''
+    if (keyFromBackend) {
+      geminiApiKey = '' // Backend will read from file
+    } else {
+      geminiApiKey = apiKey || localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY) || ''
+    }
     
-    if (!geminiApiKey) {
+    if (!keyFromBackend && !geminiApiKey) {
       alert('Please enter your Gemini API key below. Reports require a Gemini API key to generate AI-powered insights.')
       return
     }
@@ -158,23 +179,28 @@ export default function ReportForm({ onSubmit }: ReportFormProps) {
   }
 
   /**
-   * Handles saving API key
+   * Handles saving API key (writes to shared backend so desktop app sees it too)
    */
-  const handleSaveApiKey = () => {
+  const handleSaveApiKey = async () => {
     if (!apiKey.trim()) {
       setApiKeyError('API key is required')
       return
     }
     
-    // Basic validation - Gemini keys are typically alphanumeric
     if (apiKey.trim().length < 20) {
       setApiKeyError('Invalid API key format. Please check your Gemini API key.')
       return
     }
     
-    localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, apiKey.trim())
-    setShowApiKeyInput(false)
-    setApiKeyError('')
+    try {
+      await saveGeminiKey(apiKey.trim())
+      localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, apiKey.trim())
+      setKeyFromBackend(false)
+      setShowApiKeyInput(false)
+      setApiKeyError('')
+    } catch (err) {
+      setApiKeyError(err instanceof Error ? err.message : 'Failed to save key')
+    }
   }
 
   if (loading) {
@@ -254,19 +280,19 @@ export default function ReportForm({ onSubmit }: ReportFormProps) {
               <p className="text-sm text-red-600">{apiKeyError}</p>
             )}
             <p className="text-xs text-gray-600">
-              Your API key is stored locally and used to generate AI-powered report insights.
+              Your API key is stored and shared with the desktop app (Settings). Used for AI-powered report insights.
             </p>
           </div>
         </div>
       )}
 
-      {!showApiKeyInput && apiKey && (
+      {!showApiKeyInput && (apiKey || keyFromBackend) && (
         <div className="mb-6 p-3 border border-gray-200 rounded-md bg-gray-50 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-sm text-gray-700">API key configured</span>
+            <span className="text-sm text-gray-700">API key configured{keyFromBackend ? ' (shared with desktop app)' : ''}</span>
           </div>
           <button
             type="button"
@@ -308,7 +334,7 @@ export default function ReportForm({ onSubmit }: ReportFormProps) {
         <div>
           <button 
             type="submit" 
-            disabled={loading || !startDate || !endDate || !apiKey}
+            disabled={loading || !startDate || !endDate || (!keyFromBackend && !apiKey)}
             className="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             Generate Report

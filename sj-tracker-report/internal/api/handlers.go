@@ -880,3 +880,43 @@ func (h *Handlers) ServeAudioFileHandler(c *gin.Context) {
 	// Serve the file
 	c.File(absPath)
 }
+
+// GetGeminiAPIKeyStatusHandler handles GET /api/settings/gemini-api-key-status
+// Returns whether the shared Gemini API key is set (same file as desktop app). Used by report frontend to show "key configured".
+func (h *Handlers) GetGeminiAPIKeyStatusHandler(c *gin.Context) {
+	key := services.ReadGeminiKeyFromFile()
+	c.JSON(http.StatusOK, gin.H{"set": key != ""})
+}
+
+// GetGeminiAPIKeyHandler handles GET /api/settings/gemini-api-key
+// Returns the shared Gemini API key for prefill and for chat. Only intended for local use (report frontend on same machine).
+func (h *Handlers) GetGeminiAPIKeyHandler(c *gin.Context) {
+	key := services.ReadGeminiKeyFromFile()
+	if key == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Gemini API key not set"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"key": key})
+}
+
+// PostGeminiAPIKeyHandler handles POST /api/settings/gemini-api-key
+// Saves the Gemini API key to the shared file so desktop Settings and report frontend stay in sync.
+func (h *Handlers) PostGeminiAPIKeyHandler(c *gin.Context) {
+	var body struct {
+		Key string `json:"key" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "key is required"})
+		return
+	}
+	key := strings.TrimSpace(body.Key)
+	if key == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "key cannot be empty"})
+		return
+	}
+	if err := services.WriteGeminiKeyToFile(key); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Gemini API key saved"})
+}

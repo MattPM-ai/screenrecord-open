@@ -29,30 +29,48 @@ func NewReportService(dataService *DataService, aiService *AIService, mongoClien
 }
 
 // resolveGeminiAPIKey returns the Gemini API key to use: request key, then GEMINI_API_KEY env, then
-// gemini_api_key.txt in APP_DATA_DIR (or current working directory). Used so the report backend
-// can use the same key the desktop app stores when the frontend does not send one (e.g. report form
-// localStorage not synced with desktop Settings on Windows).
+// file at GEMINI_API_KEY_FILE env, then gemini_api_key.txt in APP_DATA_DIR (or current working directory).
+// Used so the report backend can use the same key the desktop app stores when the frontend does not send one.
 func resolveGeminiAPIKey(requestKey string) string {
 	s := strings.TrimSpace(requestKey)
 	if s != "" {
+		fmt.Printf("[report] Gemini API key: using key from request body\n")
 		return s
 	}
 	if s = strings.TrimSpace(os.Getenv("GEMINI_API_KEY")); s != "" {
+		fmt.Printf("[report] Gemini API key: using key from GEMINI_API_KEY env\n")
 		return s
+	}
+	// Prefer explicit key file path (set by start-bundled.bat on Windows)
+	if keyPath := strings.TrimSpace(os.Getenv("GEMINI_API_KEY_FILE")); keyPath != "" {
+		data, err := os.ReadFile(keyPath)
+		if err != nil {
+			fmt.Printf("[report] Gemini API key: GEMINI_API_KEY_FILE=%s read failed: %v\n", keyPath, err)
+		} else {
+			s = strings.TrimSpace(string(data))
+			if s != "" {
+				fmt.Printf("[report] Gemini API key: using key from file (GEMINI_API_KEY_FILE)\n")
+				return s
+			}
+		}
 	}
 	dir := os.Getenv("APP_DATA_DIR")
 	if dir == "" {
 		dir, _ = os.Getwd()
 	}
-	if dir == "" {
-		return ""
+	if dir != "" {
+		path := filepath.Join(dir, "gemini_api_key.txt")
+		data, err := os.ReadFile(path)
+		if err == nil {
+			s = strings.TrimSpace(string(data))
+			if s != "" {
+				fmt.Printf("[report] Gemini API key: using key from file %s\n", path)
+				return s
+			}
+		}
 	}
-	path := filepath.Join(dir, "gemini_api_key.txt")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(data))
+	fmt.Printf("[report] Gemini API key: no key found (request empty, no env, no key file)\n")
+	return ""
 }
 
 // GetCachedReport retrieves a cached report without generating a new one

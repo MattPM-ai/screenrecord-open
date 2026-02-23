@@ -17,6 +17,7 @@
 
 import { useState, FormEvent, useEffect } from 'react'
 import { getDefaultUser, getDefaultOrganisation, type Organisation, type OrganisationUser } from '@/lib/localTypes'
+import { getGeminiKeyStatus, saveGeminiKey } from '@/lib/geminiApiKey'
 
 const GEMINI_API_KEY_STORAGE_KEY = 'gemini_api_key'
 
@@ -112,6 +113,7 @@ export default function WeeklyReportForm({ onSubmit }: WeeklyReportFormProps) {
   const [apiKey, setApiKey] = useState<string>('')
   const [showApiKeyInput, setShowApiKeyInput] = useState(false)
   const [apiKeyError, setApiKeyError] = useState<string>('')
+  const [keyFromBackend, setKeyFromBackend] = useState(false)
 
   // Load user profile and organizations
   useEffect(() => {
@@ -153,26 +155,45 @@ export default function WeeklyReportForm({ onSubmit }: WeeklyReportFormProps) {
 
     loadData()
 
-    // Load API key from localStorage
-    const storedApiKey = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY)
-    if (storedApiKey) {
-      setApiKey(storedApiKey)
-    } else {
-      // Show API key input if not set
-      setShowApiKeyInput(true)
+    // Load API key: prefer shared backend (sync with desktop app), then localStorage
+    const loadKey = async () => {
+      try {
+        const { set } = await getGeminiKeyStatus()
+        if (set) {
+          setKeyFromBackend(true)
+          setApiKey('')
+          setShowApiKeyInput(false)
+          return
+        }
+      } catch {
+        // Backend not available
+      }
+      const storedApiKey = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY)
+      if (storedApiKey) {
+        setApiKey(storedApiKey)
+        setShowApiKeyInput(false)
+      } else {
+        setShowApiKeyInput(true)
+      }
     }
+    loadKey()
   }, [])
 
-  const handleSaveApiKey = () => {
+  const handleSaveApiKey = async () => {
     if (!apiKey || apiKey.trim() === '') {
       setApiKeyError('Please enter a valid API key')
       return
     }
 
-    // Save to localStorage
-    localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, apiKey.trim())
-    setApiKeyError('')
-    setShowApiKeyInput(false)
+    try {
+      await saveGeminiKey(apiKey.trim())
+      localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, apiKey.trim())
+      setKeyFromBackend(false)
+      setApiKeyError('')
+      setShowApiKeyInput(false)
+    } catch (err) {
+      setApiKeyError(err instanceof Error ? err.message : 'Failed to save key')
+    }
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -195,10 +216,15 @@ export default function WeeklyReportForm({ onSubmit }: WeeklyReportFormProps) {
     // Format week start date as YYYY-MM-DD
     const weekStartDateStr = selectedWeekStart.toISOString().split('T')[0]
 
-    // Get Gemini API key from localStorage (same key used by Chat component)
-    const geminiApiKey = localStorage.getItem('gemini_api_key') || ''
+    // Get Gemini API key: use shared backend (same as desktop app) or form/localStorage
+    let geminiApiKey = ''
+    if (keyFromBackend) {
+      geminiApiKey = '' // Backend will read from file
+    } else {
+      geminiApiKey = apiKey || localStorage.getItem('gemini_api_key') || ''
+    }
     
-    if (!geminiApiKey) {
+    if (!keyFromBackend && !geminiApiKey) {
       alert('Please enter your Gemini API key below. Reports require a Gemini API key to generate AI-powered insights.')
       return
     }
@@ -296,7 +322,7 @@ export default function WeeklyReportForm({ onSubmit }: WeeklyReportFormProps) {
         </div>
       )}
 
-      {!showApiKeyInput && apiKey && (
+      {!showApiKeyInput && (apiKey || keyFromBackend) && (
         <div className="mb-6 p-3 border border-gray-200 rounded-md bg-gray-50 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -347,7 +373,7 @@ export default function WeeklyReportForm({ onSubmit }: WeeklyReportFormProps) {
         <div>
           <button 
             type="submit" 
-            disabled={loading || !selectedWeekStart || !apiKey}
+            disabled={loading || !selectedWeekStart || (!keyFromBackend && !apiKey)}
             className="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             Generate Weekly Report

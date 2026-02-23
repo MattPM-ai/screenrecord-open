@@ -54,6 +54,14 @@ func SetupRoutes(handlers *Handlers) *gin.Engine {
 
 		// Audio file serving route - serves local audio files
 		api.GET("/audio-file", handlers.ServeAudioFileHandler)
+
+		// Shared Gemini API key (same file as desktop app) - for report frontend / chat to get/set
+		settings := api.Group("/settings")
+		{
+			settings.GET("/gemini-api-key-status", handlers.GetGeminiAPIKeyStatusHandler)
+			settings.GET("/gemini-api-key", handlers.GetGeminiAPIKeyHandler)
+			settings.POST("/gemini-api-key", handlers.PostGeminiAPIKeyHandler)
+		}
 	}
 
 	// Health check endpoint

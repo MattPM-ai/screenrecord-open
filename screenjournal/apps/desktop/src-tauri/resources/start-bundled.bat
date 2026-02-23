@@ -221,6 +221,8 @@ set MONGODB_USERNAME=admin
 set MONGODB_PASSWORD=admin123
 set MONGODB_AUTH_SOURCE=admin
 set OPENAI_API_KEY=
+REM Explicit path to Gemini key file (same location desktop app uses) so report backend can use it when frontend does not send key
+set GEMINI_API_KEY_FILE=%APP_DATA_DIR%\gemini_api_key.txt
 
 start /b "" "%REPORT_BINARY%" > "%APP_DATA_DIR%\report.log" 2>&1
 

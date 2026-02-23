@@ -21,6 +21,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { getSessionId } from '@/lib/session'
 import { parseMessageContent } from '@/lib/graphParser'
+import { getGeminiKeyStatus, getGeminiKey, saveGeminiKey } from '@/lib/geminiApiKey'
 import GraphDisplay from './GraphDisplay'
 
 interface Message {
@@ -79,20 +80,33 @@ export default function Chat() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   /**
-   * Initializes session ID and loads API key on component mount
+   * Initializes session ID and loads API key on component mount (shared with desktop app via backend)
    */
   useEffect(() => {
     const id = getSessionId()
     setSessionId(id)
     
-    // Load API key from localStorage
-    const storedApiKey = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY)
-    if (storedApiKey) {
-      setApiKey(storedApiKey)
-    } else {
-      // Show API key input if not set
-      setShowApiKeyInput(true)
+    const loadKey = async () => {
+      try {
+        const { set } = await getGeminiKeyStatus()
+        if (set) {
+          const key = await getGeminiKey()
+          if (key) setApiKey(key)
+          setShowApiKeyInput(false)
+          return
+        }
+      } catch {
+        // Backend not available
+      }
+      const storedApiKey = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY)
+      if (storedApiKey) {
+        setApiKey(storedApiKey)
+        setShowApiKeyInput(false)
+      } else {
+        setShowApiKeyInput(true)
+      }
     }
+    loadKey()
   }, [])
 
   /**
@@ -107,23 +121,27 @@ export default function Chat() {
   }, [messages])
 
   /**
-   * Handles saving API key
+   * Handles saving API key (writes to shared backend so desktop app and reports see it too)
    */
-  const handleSaveApiKey = () => {
+  const handleSaveApiKey = async () => {
     if (!apiKey.trim()) {
       setApiKeyError('API key is required')
       return
     }
     
-    // Basic validation - Gemini keys are typically alphanumeric
     if (apiKey.trim().length < 20) {
       setApiKeyError('Invalid API key format. Please check your Gemini API key.')
       return
     }
     
-    localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, apiKey.trim())
-    setShowApiKeyInput(false)
-    setApiKeyError('')
+    try {
+      await saveGeminiKey(apiKey.trim())
+      localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, apiKey.trim())
+      setShowApiKeyInput(false)
+      setApiKeyError('')
+    } catch (err) {
+      setApiKeyError(err instanceof Error ? err.message : 'Failed to save key')
+    }
   }
 
   /**
@@ -290,7 +308,7 @@ export default function Chat() {
               <p className="text-sm text-red-600">{apiKeyError}</p>
             )}
             <p className="text-xs text-gray-600">
-              Your API key is stored locally and only sent to the chat agent. Get your key from{' '}
+              Your API key is stored locally and shared with the desktop app. Get your key from{' '}
               <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                 Google AI Studio
               </a>
