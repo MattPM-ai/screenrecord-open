@@ -676,9 +676,9 @@ def create_agent(
     # Create tools
     try:
         tools = create_langchain_tools(backend_client)
-        print(f"✅ Loaded {len(tools)} tools from backend")
+        print(f"[CHAT-AGENT] Loaded {len(tools)} tools from backend")
     except Exception as e:
-        print(f"⚠️  Warning: Failed to load tools: {e}")
+        print(f"[CHAT-AGENT] Warning: Failed to load tools: {e}")
         tools = []
     
     # Use provided system prompt or build default one
@@ -705,7 +705,7 @@ def create_agent(
         )
     else:
         # Fallback to simple LLM if no tools
-        print("⚠️  No tools available, using simple LLM mode")
+        print("[CHAT-AGENT] No tools available, using simple LLM mode")
         # Create a simple agent executor that just uses the LLM without tools
         # For Gemini, we can use create_tool_calling_agent with empty tools
         agent = create_tool_calling_agent(llm, [], prompt)

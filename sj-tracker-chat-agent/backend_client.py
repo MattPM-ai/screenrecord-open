@@ -68,7 +68,7 @@ class BackendToolClient:
         """
         try:
             # Log the request for debugging
-            print(f"🔧 Executing tool '{tool_name}' with params: {params}")
+            print(f"[CHAT-AGENT] Executing tool '{tool_name}' with params: {params}")
             
             response = requests.post(
                 f"{self.backend_url}/api/chat/tools/execute",
@@ -79,7 +79,7 @@ class BackendToolClient:
                 timeout=60  # Tools may take longer to execute
             )
             
-            print(f"📊 Tool '{tool_name}' response status: {response.status_code}")
+            print(f"[CHAT-AGENT] Tool '{tool_name}' response status: {response.status_code}")
             
             # Check for HTTP errors and extract detailed error message
             if not response.ok:
