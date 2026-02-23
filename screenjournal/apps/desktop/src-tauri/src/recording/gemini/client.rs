@@ -145,18 +145,21 @@ pub async fn analyze_video(
 
     // Get API key (check user-provided key first if AppHandle is available)
     let api_key = if let Some(app_handle) = app {
-        super::get_api_key_with_app(app_handle).map_err(|e| GeminiError::Permanent {
-            message: e,
+        super::get_api_key_with_app(app_handle).map_err(|e| {
+            log::error!("[GEMINI] Screen timeline failed (no API key): {}", e);
+            GeminiError::Permanent { message: e }
         })?
     } else {
-        super::get_api_key().map_err(|e| GeminiError::Permanent {
-            message: e,
+        super::get_api_key().map_err(|e| {
+            log::error!("[GEMINI] Screen timeline failed (no API key): {}", e);
+            GeminiError::Permanent { message: e }
         })?
     };
 
     // Read and encode video file
-    let video_data = read_and_encode_video(video_path).map_err(|e| GeminiError::Permanent {
-        message: e,
+    let video_data = read_and_encode_video(video_path).map_err(|e| {
+        log::error!("[GEMINI] Screen timeline failed (video read/encode): {} path={:?}", e, video_path);
+        GeminiError::Permanent { message: e }
     })?;
     log::info!(
         "Video encoded: {} bytes base64 (from {:?})",
@@ -329,6 +332,21 @@ async fn send_gemini_request(
         } else {
             format!("Gemini API request failed with status {}: {}", status, response_text)
         };
+
+        log::error!(
+            "[GEMINI] Request failed: status={} model={} error={}",
+            status,
+            GEMINI_MODEL,
+            error_message
+        );
+        if status_code >= 400 && status_code < 500 {
+            let preview = if response_text.len() > 800 {
+                format!("{}...", &response_text[..800])
+            } else {
+                response_text.clone()
+            };
+            log::error!("[GEMINI] Response body (preview): {}", preview);
+        }
 
         // Classify error based on HTTP status code
         return match status_code {

@@ -159,6 +159,26 @@ The installer creates **one folder** that contains the desktop app and all backe
 
 The root **build-bundled.sh** (repo root) and `tauri.conf.json` `bundle.resources` are set up so this layout is produced on both platforms.
 
+## Log files
+
+When running the bundled app, logs are written under the **app data directory** (same folder used for MongoDB/InfluxDB data, Gemini API key, etc.):
+
+| Log file        | Contents |
+|-----------------|----------|
+| `desktop.log`   | Desktop app (Tauri) logs, including screen timeline / Gemini and recording. |
+| `report.log`    | Report backend (Go) – report generation and Gemini API. |
+| `chat-agent.log`| Chat agent (Python) – chat and agent errors. |
+| `collector.log` | sj-collector. |
+| `mongodb.log`   | MongoDB. |
+| `influxdb.log`  | InfluxDB. |
+| `frontend.log`  | Report frontend (Next.js), if started. |
+
+**App data directory location:**
+- **Windows:** `%APPDATA%\com.screenjournal.tracker\` (e.g. `C:\Users\<You>\AppData\Roaming\com.screenjournal.tracker\`)
+- **macOS:** `~/Library/Application Support/com.screenjournal.tracker/`
+
+Open `desktop.log` to inspect screen timeline (Gemini) failures, recording, and other desktop app issues.
+
 ## Production Distribution
 
 When you build your app with `npm run tauri:build`, the ActivityWatch binaries are **automatically bundled** into the final application. End users who download your app will have all binaries included - they don't need to download anything separately.

@@ -392,10 +392,13 @@ async fn process_job(app: &AppHandle, mut job: GeminiJob) {
                 GeminiError::Permanent { .. } => {
                     // Permanent errors - no retry
                     log::error!(
-                        "Permanent error for segment {} display {}: {}",
+                        "[GEMINI-QUEUE] Permanent error for segment {} display {}: {}",
                         job.segment_id,
                         job.display_index,
                         e
+                    );
+                    log::error!(
+                        "[GEMINI-QUEUE] Screen timeline will not retry. Check Settings: Gemini API key and model availability (e.g. model not found or invalid key)."
                     );
                     mark_job_failed(&e.to_string());
                     remove_persisted_job(app, &job);

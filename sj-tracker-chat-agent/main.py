@@ -13,6 +13,8 @@ PURPOSE: Chat interface using Google Gemini LLM with tool support
 import os
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+import sys
+import traceback
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -665,6 +667,7 @@ def create_agent(
         temperature=0.3,
         google_api_key=api_key
     )
+    print(f"[CHAT-AGENT] LLM initialized: model={model}")
     
     # If no backend client provided, create one
     if backend_client is None:
@@ -752,6 +755,8 @@ def process_message(
         return result.get("output", "No response generated")
         
     except Exception as e:
+        print(f"[CHAT-AGENT] process_message failed: {type(e).__name__}: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
         return f"Error processing message: {str(e)}"
 
 

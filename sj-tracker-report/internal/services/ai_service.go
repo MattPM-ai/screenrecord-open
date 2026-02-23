@@ -247,6 +247,7 @@ func callGeminiAPI(apiKey string, model string, systemPrompt string, userPrompt 
 	
 	req.Header.Set("Content-Type", "application/json")
 	
+	fmt.Printf("[report] Gemini API request: model=%s\n", model)
 	client := &http.Client{Timeout: 120 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -256,7 +257,9 @@ func callGeminiAPI(apiKey string, model string, systemPrompt string, userPrompt 
 	
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("Gemini API error (status %d): %s", resp.StatusCode, string(bodyBytes))
+		bodyStr := string(bodyBytes)
+		fmt.Printf("[report] Gemini API error: status=%d model=%s body=%s\n", resp.StatusCode, model, bodyStr)
+		return "", fmt.Errorf("Gemini API error (status %d): %s", resp.StatusCode, bodyStr)
 	}
 	
 	// Parse response

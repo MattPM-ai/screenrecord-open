@@ -1,4 +1,5 @@
 use tauri::Manager;
+use tauri_plugin_log::{Target, TargetKind};
 
 pub mod activitywatch;
 pub mod recording;
@@ -66,9 +67,32 @@ pub fn run() {
             } else {
                 log::LevelFilter::Info
             };
-            
+
+            // Write logs to app data dir so users can read them (e.g. desktop.log alongside report.log, chat-agent.log)
+            let log_targets: Vec<tauri_plugin_log::Target> = match app.path().app_data_dir() {
+                Ok(dir) => {
+                    let _ = std::fs::create_dir_all(&dir);
+                    vec![
+                        Target::new(TargetKind::Stderr),
+                        Target::new(TargetKind::Folder {
+                            path: dir,
+                            file_name: Some("desktop.log".to_string()),
+                        }),
+                    ]
+                }
+                Err(_) => {
+                    vec![
+                        Target::new(TargetKind::Stderr),
+                        Target::new(TargetKind::LogDir {
+                            file_name: Some("desktop.log".to_string()),
+                        }),
+                    ]
+                }
+            };
+
             app.handle().plugin(
                 tauri_plugin_log::Builder::default()
+                    .targets(log_targets)
                     .level(log_level)
                     // Set specific levels for modules
                     .level_for("app_lib::services", log::LevelFilter::Info) // Always show service logs

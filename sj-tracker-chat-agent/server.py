@@ -11,6 +11,8 @@ PURPOSE: HTTP API server for LLM chat with tool support
 """
 
 import os
+import sys
+import traceback
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -49,9 +51,14 @@ def get_or_create_agent(api_key: str) -> AgentExecutor:
         return agent_cache[api_key]
     
     # Create new agent with user's API key
-    agent_executor = create_agent(api_key, GEMINI_MODEL, backend_client)
+    try:
+        agent_executor = create_agent(api_key, GEMINI_MODEL, backend_client)
+    except Exception as e:
+        print(f"[CHAT-AGENT] ERROR: Failed to create agent (model={GEMINI_MODEL}): {type(e).__name__}: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        raise
     agent_cache[api_key] = agent_executor
-    print(f"Created new agent for API key (key: {api_key[:10]}...)")
+    print(f"[CHAT-AGENT] Created new agent for API key (key: {api_key[:10]}...) model={GEMINI_MODEL}")
     
     return agent_executor
 
@@ -85,11 +92,17 @@ def chat():
         if not gemini_api_key or not isinstance(gemini_api_key, str) or not gemini_api_key.strip():
             return jsonify({"error": "geminiApiKey is required and must be a non-empty string"}), 400
         
+        api_key_trimmed = gemini_api_key.strip()
+        print(f"[CHAT-AGENT] Chat request: session_id={session_id} model={GEMINI_MODEL} api_key_prefix={api_key_trimmed[:10]}...")
+        
         # Get or create agent for this API key
         try:
-            agent_executor = get_or_create_agent(gemini_api_key.strip())
+            agent_executor = get_or_create_agent(api_key_trimmed)
         except Exception as e:
-            return jsonify({"error": f"Failed to initialize agent: {str(e)}"}), 500
+            err_msg = f"Failed to initialize agent: {str(e)}"
+            print(f"[CHAT-AGENT] ERROR: {err_msg}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            return jsonify({"error": err_msg}), 500
         
         # Get or create chat history for this session
         if session_id not in chat_sessions:
@@ -113,11 +126,13 @@ def chat():
             return jsonify({"response": response_text})
             
         except Exception as e:
-            print(f"Error processing message: {e}")
+            print(f"[CHAT-AGENT] ERROR: process_message failed: {type(e).__name__}: {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
             return jsonify({"error": f"Error processing message: {str(e)}"}), 500
             
     except Exception as e:
-        print(f"Error in chat endpoint: {e}")
+        print(f"[CHAT-AGENT] ERROR: chat endpoint: {type(e).__name__}: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
         return jsonify({"error": str(e)}), 500
 
 
