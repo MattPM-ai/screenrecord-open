@@ -47,6 +47,7 @@
       "resources/python": "python",
       "resources/databases": "databases",
       "resources/frontend": "frontend",
+      "resources/whisper-tiny.en.bin": "whisper-tiny.en.bin",
       "resources/start-bundled.sh": "start-bundled.sh",
       "resources/start-bundled.bat": "start-bundled.bat"
     },

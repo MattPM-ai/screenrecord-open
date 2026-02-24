@@ -39,6 +39,23 @@ static WHISPER_AVAILABLE: OnceLock<bool> = OnceLock::new();
 // Path Resolution
 // =============================================================================
 
+/// Convert a path to a string suitable for C APIs (e.g. whisper.cpp).
+/// On Windows, strips the verbatim prefix \\?\ so that C runtime can open the file.
+fn path_to_c_str(path: &Path) -> Result<String, String> {
+    let s = path
+        .to_str()
+        .ok_or_else(|| "Invalid model path encoding".to_string())?;
+    #[cfg(windows)]
+    let s = {
+        if s.starts_with(r"\\?\") {
+            s.strip_prefix(r"\\?\").unwrap_or(s)
+        } else {
+            s
+        }
+    };
+    Ok(s.to_string())
+}
+
 /**
  * Resolve the Whisper model file path (dev and production)
  * 
@@ -83,12 +100,24 @@ pub fn resolve_whisper_model_path(app: &AppHandle) -> Option<PathBuf> {
     // PROD: Use packaged resource dir
     if let Ok(resource_dir) = app.path().resource_dir() {
         let prod_path = resource_dir.join(model_name);
+        log::info!(
+            "[WHISPER] Checking prod path: resource_dir={:?}, model_path={:?}, exists={}",
+            resource_dir,
+            prod_path,
+            prod_path.exists()
+        );
         if prod_path.exists() {
             log::info!("Whisper model path (prod): {:?}", prod_path);
             return Some(prod_path);
-        } else {
-            log::warn!("Whisper model not found at {:?}", prod_path);
         }
+        // Fallback: Tauri resolve (can differ on Windows)
+        if let Ok(p) = app.path().resolve(model_name, tauri::path::BaseDirectory::Resource) {
+            if p.exists() {
+                log::info!("Whisper model found via resolve fallback: {:?}", p);
+                return Some(p);
+            }
+        }
+        log::warn!("Whisper model not found at {:?}", prod_path);
     } else {
         log::error!("Failed to resolve resource_dir for Whisper model");
     }
@@ -133,10 +162,10 @@ pub fn init_whisper(model_path: &Path) -> Result<(), String> {
     // Load the model
     let params = WhisperContextParameters::default();
     
-    let model_path_str = model_path.to_str()
-        .ok_or_else(|| "Invalid model path encoding".to_string())?;
+    // Use a path string that C APIs on Windows can open (strip verbatim prefix \\?\ if present)
+    let model_path_str = path_to_c_str(model_path)?;
     
-    match WhisperContext::new_with_params(model_path_str, params) {
+    match WhisperContext::new_with_params(&model_path_str, params) {
         Ok(ctx) => {
             WHISPER_CONTEXT.set(ctx)
                 .map_err(|_| "Whisper already initialized".to_string())?;
