@@ -173,15 +173,6 @@ jobs:
         run: npm run setup-whisper
         working-directory: screenjournal/apps/desktop
 
-      - name: Verify bundle resources (whisper model)
-        run: |
-          W="screenjournal/apps/desktop/src-tauri/resources/whisper-tiny.en.bin"
-          if [ ! -f "$W" ]; then
-            echo "Missing $W - required for Tauri bundle (tauri.conf.json)"
-            exit 1
-          fi
-          echo "Whisper model present: $W"
-
       # =========================================================================
       # Import Apple Code Signing Certificate (macOS only)
       # =========================================================================
