@@ -13,8 +13,8 @@
 
 import { useEffect, useState } from "react";
 import { getAllServicesStatus, type AllServicesStatus } from "@/lib/servicesClient";
-import { CheckCircle2, Loader2, XCircle, AlertCircle } from "lucide-react";
-import { cn } from "@repo/ui";
+import { CheckCircle2, Loader2, XCircle, AlertCircle, ExternalLink } from "lucide-react";
+import { Button, cn } from "@repo/ui";
 import { listen } from "@tauri-apps/api/event";
 
 type ServiceStatus = "starting" | "ready" | "failed" | "unknown";
@@ -297,6 +297,19 @@ export function ServiceStartupScreen({
 
         {/* Elapsed Time */}
         <p className="text-xs text-muted-foreground">Elapsed: {elapsedSeconds}s</p>
+
+        {/* Stuck? Go to app - failsafe if auto-transition doesn't happen */}
+        {allReady && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-4 text-muted-foreground hover:text-foreground"
+            onClick={onReady}
+          >
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Stuck? Go to app
+          </Button>
+        )}
       </div>
     </div>
   );
