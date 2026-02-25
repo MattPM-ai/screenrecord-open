@@ -773,6 +773,19 @@ func (h *Handlers) GetAudioTranscriptsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// stripVerbatimPathPrefix removes the Windows verbatim prefix \\?\ from p so that
+// filepath and os calls work and path checks match allowed base dirs. No-op on non-Windows.
+func stripVerbatimPathPrefix(p string) string {
+	if runtime.GOOS != "windows" {
+		return p
+	}
+	const prefix = "\\?\\"
+	if strings.HasPrefix(p, prefix) {
+		return p[len(prefix):]
+	}
+	return p
+}
+
 // ServeAudioFileHandler handles GET /api/audio-file
 // Serves local audio files from the filesystem
 // Security: Validates that the file path is within the expected audio directory
@@ -783,6 +796,8 @@ func (h *Handlers) ServeAudioFileHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "path parameter is required"})
 		return
 	}
+	// Normalize Windows verbatim paths (\\?\C:\...) so path checks and os.Stat work
+	filePath = stripVerbatimPathPrefix(filePath)
 
 	// Validate and resolve the file path
 	// Audio files can be stored in multiple locations:

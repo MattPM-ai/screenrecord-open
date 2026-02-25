@@ -28,6 +28,18 @@ use crate::recording::transcription::{
     whisper,
 };
 use chrono::Utc;
+
+/// Return a path string suitable for storage (e.g. InfluxDB) and URLs.
+/// On Windows, strips the verbatim prefix \\?\ so the path can be used by the report backend.
+#[cfg(windows)]
+fn path_str_for_storage(s: &str) -> String {
+    s.strip_prefix(r"\\?\").unwrap_or(s).to_string()
+}
+
+#[cfg(not(windows))]
+fn path_str_for_storage(s: &str) -> String {
+    s.to_string()
+}
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -388,11 +400,13 @@ async fn process_job(app: &AppHandle, mut job: TranscriptionJob) {
                 }
 
                 // Send to collector (non-blocking, errors logged but don't fail the job)
-                // Convert audio_path_local (PathBuf) to string for formatter
+                // Convert audio_path_local (PathBuf) to string for formatter.
+                // On Windows, strip the verbatim prefix (\\?\) so InfluxDB stores a path
+                // that the report backend and /api/audio-file can use.
                 let audio_path_str = job.audio_path_local
                     .as_ref()
                     .and_then(|p| p.to_str())
-                    .map(|s| s.to_string());
+                    .map(path_str_for_storage);
                 
                 if let Err(e) = send_to_collector(&transcription, &job.segment_start_time, audio_path_str.as_deref()) {
                     log::error!("[TRANSCRIPTION-QUEUE] Failed to send transcript to collector: {}", e);
