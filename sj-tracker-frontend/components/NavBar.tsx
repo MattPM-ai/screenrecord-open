@@ -95,7 +95,7 @@ export default function NavBar() {
             )}
           </div>
           <Link href="/" className="text-xl font-semibold text-blue-600 hover:text-blue-700 transition-colors">
-            ScreenJournal
+            ScreenRecord
           </Link>
         </div>
 

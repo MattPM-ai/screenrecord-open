@@ -1,4 +1,4 @@
-# ScreenJournal Open
+# ScreenRecord Open
 
 A productivity tracking application that monitors your computer usage and generates insights about your work patterns.
 
@@ -82,7 +82,7 @@ Creates a `.dmg` installer for macOS:
 - Database binaries will be downloaded automatically if needed
 
 **Output:**
-- DMG installer: `screenjournal/apps/desktop/src-tauri/target/release/bundle/dmg/ScreenJournal Tracker_*.dmg`
+- DMG installer: `screenrecord/apps/desktop/src-tauri/target/release/bundle/dmg/ScreenRecord Tracker_*.dmg`
 
 ### Windows Build
 
@@ -100,8 +100,8 @@ Creates a Windows `.exe` installer or distribution zip:
   - Note: NSIS installer generation requires Windows
 
 **Output:**
-- **On Windows**: NSIS installer at `screenjournal/apps/desktop/src-tauri/target/release/bundle/nsis/*.exe`
-- **Cross-compiled from macOS**: Distribution zip at `screenjournal/apps/desktop/src-tauri/target/x86_64-pc-windows-gnu/ScreenJournal-Tracker-Windows-*.zip`
+- **On Windows**: NSIS installer at `screenrecord/apps/desktop/src-tauri/target/release/bundle/nsis/*.exe`
+- **Cross-compiled from macOS**: Distribution zip at `screenrecord/apps/desktop/src-tauri/target/x86_64-pc-windows-gnu/ScreenRecord-Tracker-Windows-*.zip`
 
 **Note**: Cross-compilation from macOS creates a zip file that users can extract and run. For a proper Windows installer, build on Windows directly.
 
@@ -119,11 +119,11 @@ Creates a `.deb` package for Debian/Ubuntu:
 - Linux-specific build dependencies (see Platform-Specific Dependencies above)
 
 **Output:**
-- DEB package: `screenjournal/apps/desktop/src-tauri/target/release/bundle/deb/*.deb`
+- DEB package: `screenrecord/apps/desktop/src-tauri/target/release/bundle/deb/*.deb`
 
 **Installation:**
 ```bash
-sudo dpkg -i screenjournal-tracker_*.deb
+sudo dpkg -i screenrecord-tracker_*.deb
 ```
 
 ## Build Script Details
@@ -143,19 +143,19 @@ All build scripts follow a similar process:
 
 ### Build Output Locations
 
-- **macOS**: `screenjournal/apps/desktop/src-tauri/target/release/bundle/dmg/`
-- **Windows (native)**: `screenjournal/apps/desktop/src-tauri/target/release/bundle/nsis/`
-- **Windows (cross-compiled)**: `screenjournal/apps/desktop/src-tauri/target/x86_64-pc-windows-gnu/`
-- **Linux**: `screenjournal/apps/desktop/src-tauri/target/release/bundle/deb/`
+- **macOS**: `screenrecord/apps/desktop/src-tauri/target/release/bundle/dmg/`
+- **Windows (native)**: `screenrecord/apps/desktop/src-tauri/target/release/bundle/nsis/`
+- **Windows (cross-compiled)**: `screenrecord/apps/desktop/src-tauri/target/x86_64-pc-windows-gnu/`
+- **Linux**: `screenrecord/apps/desktop/src-tauri/target/release/bundle/deb/`
 
 ## Additional Notes
 
 - **Database Setup**: The bundled applications automatically set up InfluxDB on first run
 - **Service Management**: All services start automatically when the bundled app launches
 - **Logs**: Service logs are stored in the application data directory:
-  - **macOS**: `~/Library/Application Support/com.screenjournal.tracker/`
-  - **Windows**: `%APPDATA%\com.screenjournal.tracker\`
-  - **Linux**: `~/.local/share/com.screenjournal.tracker/`
+  - **macOS**: `~/Library/Application Support/com.screenrecord.tracker/`
+  - **Windows**: `%APPDATA%\com.screenrecord.tracker\`
+  - **Linux**: `~/.local/share/com.screenrecord.tracker/`
 
 ## Troubleshooting
 

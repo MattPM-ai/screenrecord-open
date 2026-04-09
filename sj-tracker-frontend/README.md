@@ -1,4 +1,4 @@
-# ScreenJournal Tracker Frontend
+# ScreenRecord Tracker Frontend
 
 A minimalist, light-theme chat interface built with Next.js and TypeScript, designed to communicate with an n8n webhook.
 

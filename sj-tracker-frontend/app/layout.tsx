@@ -17,8 +17,8 @@ import './globals.css'
 import NavBar from '@/components/NavBar'
 
 export const metadata: Metadata = {
-  title: 'ScreenJournal',
-  description: 'ScreenJournal tracker interface',
+  title: 'ScreenRecord',
+  description: 'ScreenRecord tracker interface',
 }
 
 export default function RootLayout({

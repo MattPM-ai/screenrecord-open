@@ -1,6 +1,6 @@
 # Turbo Organization Test Data
 
-Comprehensive test dataset for the ScreenJournal collector system, containing realistic activity data for 8 users across 9 days (November 15-23, 2025).
+Comprehensive test dataset for the ScreenRecord collector system, containing realistic activity data for 8 users across 9 days (November 15-23, 2025).
 
 ## 📊 Overview
 
@@ -121,14 +121,14 @@ test-data/
 
 **Automated upload:**
 ```bash
-./upload_with_curl.sh screenjournal-metrics-dev "your-token-here" "http://195.74.52.54:8181"
+./upload_with_curl.sh screenrecord-metrics-dev "your-token-here" "http://195.74.52.54:8181"
 ```
 
 **Manual upload (single file with curl):**
 ```bash
 # Remove comments and upload
 grep -v '^#' influxdb/app_usage.lp | grep -v '^$' | \
-  curl -X POST "http://localhost:8181/api/v3/write_lp?db=screenjournal-metrics-dev" \
+  curl -X POST "http://localhost:8181/api/v3/write_lp?db=screenrecord-metrics-dev" \
     -H "Authorization: Token your-token-here" \
     -H "Content-Type: text/plain" \
     --data-binary @-
@@ -143,7 +143,7 @@ curl -X POST "http://localhost:8181/api/v3/query/sql" \
   -H "Authorization: Token your-token-here" \
   -H "Content-Type: application/json" \
   -d '{
-    "db": "screenjournal-metrics-dev",
+    "db": "screenrecord-metrics-dev",
     "query": "SELECT COUNT(*) FROM app_usage"
   }'
 
@@ -152,7 +152,7 @@ curl -X POST "http://localhost:8181/api/v3/query/sql" \
   -H "Authorization: Token your-token-here" \
   -H "Content-Type: application/json" \
   -d '{
-    "db": "screenjournal-metrics-dev",
+    "db": "screenrecord-metrics-dev",
     "query": "SELECT DISTINCT user FROM app_usage ORDER BY user"
   }'
 ```
@@ -338,7 +338,7 @@ The dataset intentionally includes:
 curl -X POST "http://localhost:8181/api/v3/configure/database" \
   -H "Authorization: Token your-token" \
   -H "Content-Type: application/json" \
-  -d '{"name": "screenjournal-metrics-dev"}'
+  -d '{"name": "screenrecord-metrics-dev"}'
 ```
 
 **Error: "authentication failed"**

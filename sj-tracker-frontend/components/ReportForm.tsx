@@ -127,7 +127,7 @@ export default function ReportForm({ onSubmit }: ReportFormProps) {
     // Use default user for local version
     const defaultUser: OrganisationUser = {
       id: 0,
-      email: 'local@screenjournal.local',
+      email: 'local@screenrecord.local',
       name: 'Local User',
       owner: true,
       created_at: new Date().toISOString(),

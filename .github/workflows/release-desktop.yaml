@@ -1,6 +1,6 @@
 # Release Desktop App Workflow
 #
-# Builds and publishes the ScreenJournal Open desktop app for macOS and Windows.
+# Builds and publishes the ScreenRecord Open desktop app for macOS and Windows.
 # This version bundles all services (databases, backends, frontend) into a standalone app.
 # Triggers on version tags (v*.*.*) or manual dispatch.
 #
@@ -67,8 +67,8 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               tag_name: `v${{ steps.version.outputs.version }}`,
-              name: `ScreenJournal Open v${{ steps.version.outputs.version }}`,
-              body: `## ScreenJournal Open v${{ steps.version.outputs.version }}\n\nDownload the installer for your platform below.\n\n### Installation\n- **macOS**: Download the .dmg file and drag to Applications\n- **Windows**: Download the .exe or .msi installer and run it`,
+              name: `ScreenRecord Open v${{ steps.version.outputs.version }}`,
+              body: `## ScreenRecord Open v${{ steps.version.outputs.version }}\n\nDownload the installer for your platform below.\n\n### Installation\n- **macOS**: Download the .dmg file and drag to Applications\n- **Windows**: Download the .exe or .msi installer and run it`,
               draft: true,
               prerelease: false
             })
@@ -118,7 +118,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './screenjournal/apps/desktop/src-tauri -> target'
+          workspaces: './screenrecord/apps/desktop/src-tauri -> target'
 
       # =========================================================================
       # Platform-specific dependencies
@@ -139,11 +139,11 @@ jobs:
       # =========================================================================
       - name: Install root dependencies
         run: npm ci
-        working-directory: screenjournal
+        working-directory: screenrecord
 
       - name: Install desktop dependencies
         run: npm ci
-        working-directory: screenjournal/apps/desktop
+        working-directory: screenrecord/apps/desktop
 
       - name: Install frontend dependencies
         run: npm ci
@@ -154,7 +154,7 @@ jobs:
       # =========================================================================
       - name: Build UI package
         run: npm run build --workspace=@repo/ui
-        working-directory: screenjournal
+        working-directory: screenrecord
 
       # =========================================================================
       # Setup ActivityWatch, FFmpeg, and Whisper (required for desktop app)
@@ -163,15 +163,15 @@ jobs:
       # before tauri build so the installer includes it (Windows NSIS / macOS .app).
       - name: Setup ActivityWatch
         run: npm run setup-aw
-        working-directory: screenjournal/apps/desktop
+        working-directory: screenrecord/apps/desktop
 
       - name: Setup FFmpeg
         run: npm run setup-ffmpeg
-        working-directory: screenjournal/apps/desktop
+        working-directory: screenrecord/apps/desktop
 
       - name: Setup Whisper model
         run: npm run setup-whisper
-        working-directory: screenjournal/apps/desktop
+        working-directory: screenrecord/apps/desktop
 
       # =========================================================================
       # Import Apple Code Signing Certificate (macOS only)
@@ -265,12 +265,12 @@ jobs:
         if: matrix.platform == 'macos-latest'
         env:
           IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          ENTITLEMENTS: "screenjournal/apps/desktop/src-tauri/entitlements.plist"
+          ENTITLEMENTS: "screenrecord/apps/desktop/src-tauri/entitlements.plist"
         run: |
           echo "🔏 Signing ActivityWatch and FFmpeg binaries (before bundling)..."
           
           # Sign ActivityWatch binaries (targeted - only in resources directory)
-          AW_RESOURCES="screenjournal/apps/desktop/src-tauri/resources/activitywatch"
+          AW_RESOURCES="screenrecord/apps/desktop/src-tauri/resources/activitywatch"
           if [ -d "$AW_RESOURCES" ]; then
             echo "  📦 Signing ActivityWatch binaries..."
             # Remove Python.framework/Python symlinks to prevent signing ambiguity
@@ -295,7 +295,7 @@ jobs:
           fi
           
           # Sign FFmpeg binaries (targeted - only in resources directory)
-          FFMPEG_RESOURCES="screenjournal/apps/desktop/src-tauri/resources/ffmpeg"
+          FFMPEG_RESOURCES="screenrecord/apps/desktop/src-tauri/resources/ffmpeg"
           if [ -d "$FFMPEG_RESOURCES" ]; then
             echo "  📦 Signing FFmpeg binaries..."
             find "$FFMPEG_RESOURCES" -type f \( -perm +111 -o -name "*.dylib" \) ! -name ".*" | while read binary; do
@@ -363,14 +363,14 @@ jobs:
             const path = require('path');
             const { execSync } = require('child_process');
             
-            const dmgFiles = execSync(`find screenjournal/apps/desktop/src-tauri/target -name "*.dmg" -type f`, { encoding: 'utf-8' }).trim().split('\n').filter(f => f);
+            const dmgFiles = execSync(`find screenrecord/apps/desktop/src-tauri/target -name "*.dmg" -type f`, { encoding: 'utf-8' }).trim().split('\n').filter(f => f);
             
             if (dmgFiles.length === 0) {
               throw new Error('No DMG file found');
             }
             
             const dmgPath = dmgFiles[0];
-            const dmgName = `ScreenJournal-Open-${process.env.ARTIFACT_NAME}-${process.env.VERSION}.dmg`;
+            const dmgName = `ScreenRecord-Open-${process.env.ARTIFACT_NAME}-${process.env.VERSION}.dmg`;
             
             console.log(`Uploading ${dmgPath} as ${dmgName}`);
             
@@ -404,7 +404,7 @@ jobs:
             // Only upload the NSIS installer (single standalone setup.exe). Do not upload
             // bundled resource .exe files (aw-server, ffmpeg, mongod, etc.) — those are
             // packaged inside the installer and installed into one folder (like macOS).
-            const nsisDir = path.join(root, 'screenjournal', 'apps', 'desktop', 'src-tauri', 'target', 'release', 'bundle', 'nsis');
+            const nsisDir = path.join(root, 'screenrecord', 'apps', 'desktop', 'src-tauri', 'target', 'release', 'bundle', 'nsis');
             if (!fs.existsSync(nsisDir)) {
               throw new Error('NSIS bundle directory not found: ' + nsisDir);
             }
@@ -416,7 +416,7 @@ jobs:
             }
             const filePath = path.join(nsisDir, installerExe);
             const version = process.env.VERSION;
-            const assetName = `ScreenJournal-Open-Windows-${version}.exe`;
+            const assetName = `ScreenRecord-Open-Windows-${version}.exe`;
             const data = fs.readFileSync(filePath);
             await github.rest.repos.uploadReleaseAsset({
               owner: context.repo.owner,

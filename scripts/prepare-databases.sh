@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
-RESOURCES_DIR="$PROJECT_ROOT/screenjournal/apps/desktop/src-tauri/resources/databases"
+RESOURCES_DIR="$PROJECT_ROOT/screenrecord/apps/desktop/src-tauri/resources/databases"
 
 echo -e "${GREEN}📦 Preparing Database Binaries${NC}"
 echo ""

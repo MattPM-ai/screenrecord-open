@@ -1,6 +1,6 @@
 # Local Development Setup Guide
 
-This guide will help you run the screenjournal-collector service locally for testing.
+This guide will help you run the screenrecord-collector service locally for testing.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ This guide will help you run the screenjournal-collector service locally for tes
 ### 1. Install Dependencies
 
 ```bash
-cd /Users/alexanderwestlake/repos/screenjournal-open/sj-collector
+cd /Users/alexanderwestlake/repos/screenrecord-open/sj-collector
 go mod download
 ```
 
@@ -33,7 +33,7 @@ JWT_SECRET=your-secret-key-change-in-production
 # InfluxDB Configuration (REQUIRED)
 INFLUXDB_URL=http://localhost:8181
 INFLUXDB_TOKEN=your-influxdb-token-here
-INFLUXDB_DATABASE=screenjournal-metrics-dev
+INFLUXDB_DATABASE=screenrecord-metrics-dev
 
 # S3 Configuration (REQUIRED)
 S3_BUCKET=your-bucket-name
@@ -66,10 +66,10 @@ Expected response:
 
 ### 2. Get JWT Token (Mock Auth)
 
-**Note:** The `/mock-auth` endpoint now requires authentication with a valid JWT token from screenjournal-backend. You must first obtain a token from screenjournal-backend, then use it to access this endpoint.
+**Note:** The `/mock-auth` endpoint now requires authentication with a valid JWT token from screenrecord-backend. You must first obtain a token from screenrecord-backend, then use it to access this endpoint.
 
 ```bash
-# First, obtain a backend JWT token from screenjournal-backend
+# First, obtain a backend JWT token from screenrecord-backend
 # Then use it to access mock-auth:
 curl -X POST http://localhost:8080/mock-auth \
   -H "Authorization: Bearer YOUR_BACKEND_JWT_TOKEN" \
@@ -90,7 +90,7 @@ Expected response:
 }
 ```
 
-**Important:** The `JWT_SECRET` environment variable must match the secret used by screenjournal-backend for token validation to work.
+**Important:** The `JWT_SECRET` environment variable must match the secret used by screenrecord-backend for token validation to work.
 
 Save the token for the next steps.
 
@@ -186,7 +186,7 @@ S3_REGION=us-east-1
 docker run -d \
   --name influxdb \
   -p 8181:8181 \
-  -e INFLUXDB_DATABASE=screenjournal-metrics-dev \
+  -e INFLUXDB_DATABASE=screenrecord-metrics-dev \
   quay.io/influxdb/influxdb:3.0.0
 ```
 

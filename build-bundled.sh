@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Build script for creating a single bundled ScreenJournal application
+# Build script for creating a single bundled ScreenRecord application
 # This creates a DMG installer containing all services and the desktop app
 
 set -e
@@ -25,7 +25,7 @@ fi
 VENV_ACTIVATE="venv-build/bin/activate"
 [[ $IS_WINDOWS -eq 1 ]] && VENV_ACTIVATE="venv-build/Scripts/activate"
 
-echo -e "${GREEN}🔨 Building Bundled ScreenJournal Application${NC}"
+echo -e "${GREEN}🔨 Building Bundled ScreenRecord Application${NC}"
 [[ $IS_WINDOWS -eq 1 ]] && echo -e "${YELLOW}   (Windows build)${NC}"
 echo ""
 
@@ -299,7 +299,7 @@ echo ""
 
 # Prepare database binaries if not already done
 echo -e "${YELLOW}📦 Preparing database binaries...${NC}"
-TAURI_RESOURCES_DIR="screenjournal/apps/desktop/src-tauri/resources"
+TAURI_RESOURCES_DIR="screenrecord/apps/desktop/src-tauri/resources"
 if [ ! -d "$TAURI_RESOURCES_DIR/databases" ] || [ -z "$(ls -A $TAURI_RESOURCES_DIR/databases 2>/dev/null)" ]; then
     ./scripts/prepare-databases.sh
     if [ $? -ne 0 ]; then
@@ -348,7 +348,7 @@ echo -e "${BLUE}🖥️  Building bundled desktop app...${NC}"
 
 # Build UI package first (needed by desktop app)
 echo -e "${YELLOW}📦 Building UI package...${NC}"
-cd screenjournal
+cd screenrecord
 npm run build --workspace=@repo/ui
 if [ $? -ne 0 ]; then
     echo -e "${RED}❌ Failed to build UI package${NC}"
@@ -356,7 +356,7 @@ if [ $? -ne 0 ]; then
 fi
 cd ..
 
-cd screenjournal/apps/desktop
+cd screenrecord/apps/desktop
 
 if [ ! -d node_modules ]; then
     echo -e "${YELLOW}📦 Installing desktop app dependencies...${NC}"
@@ -386,7 +386,7 @@ echo -e "${YELLOW}📦 Copying frontend to Tauri resources (before build)...${NC
     
 # Build Tauri app (this will bundle resources, sign, and notarize once)
 # Note: Tauri will create a DMG, but we'll recreate it after notarization
-    cd screenjournal/apps/desktop
+    cd screenrecord/apps/desktop
 
 # Set signing identity for CI builds (GitHub Actions)
 # Local builds use ad-hoc signing ("-") by default in tauri.conf.json
@@ -407,13 +407,13 @@ if [ $? -eq 0 ]; then
     if [[ "$OSTYPE" == "darwin"* ]]; then
         echo -e "${YELLOW}📦 Recreating DMG with notarized app bundle...${NC}"
         
-        APP_BUNDLE_PATH="src-tauri/target/release/bundle/macos/ScreenJournal Tracker.app"
+        APP_BUNDLE_PATH="src-tauri/target/release/bundle/macos/ScreenRecord Tracker.app"
         DMG_DIR="src-tauri/target/release/bundle/dmg"
-        DMG_NAME="ScreenJournal Tracker_0.1.0_aarch64.dmg"
+        DMG_NAME="ScreenRecord Tracker_0.1.0_aarch64.dmg"
         DMG_PATH="$DMG_DIR/$DMG_NAME"
         
         # Unmount any existing DMG volumes with the same name to avoid "Resource busy" error
-        VOLUME_NAME="ScreenJournal Tracker"
+        VOLUME_NAME="ScreenRecord Tracker"
         echo -e "${YELLOW}   Checking for mounted DMG volumes...${NC}"
         # Get all mounted volumes matching the name
         MOUNTED_VOLUMES=$(hdiutil info | grep -B 5 "$VOLUME_NAME" | grep "/Volumes" | awk '{print $3}' | tr '\n' ' ')
@@ -497,7 +497,7 @@ echo ""
 echo -e "${GREEN}📍 Build Output:${NC}"
 echo -e "  - Go binaries: $BUILD_DIR/binaries/${NC}"
 echo -e "  - Python environment: $BUILD_DIR/python/${NC}"
-echo -e "  - Tauri app bundle: screenjournal/apps/desktop/src-tauri/target/release/bundle/${NC}"
+echo -e "  - Tauri app bundle: screenrecord/apps/desktop/src-tauri/target/release/bundle/${NC}"
 if [[ "$OSTYPE" == "darwin"* ]] && [ -n "$DMG_PATH" ]; then
     echo -e "  - DMG installer: $DMG_PATH${NC}"
 fi

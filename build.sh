@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Build script for ScreenJournal Productivity Tracker system
+# Build script for ScreenRecord Productivity Tracker system
 # This script builds all components into production-ready executables
 
 set -e
@@ -28,7 +28,7 @@ export NODE_OPTIONS="--max-old-space-size=${NODE_MEMORY_LIMIT}"
 RUST_JOBS="${RUST_JOBS:-$(($(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 8) / 2))}"
 export CARGO_BUILD_JOBS="${RUST_JOBS}"
 
-echo -e "${GREEN}🔨 Building ScreenJournal Productivity Tracker System${NC}"
+echo -e "${GREEN}🔨 Building ScreenRecord Productivity Tracker System${NC}"
 NODE_GB=$((NODE_MEMORY_LIMIT / 1024))
 
 # Check available memory (macOS)
@@ -139,7 +139,7 @@ echo ""
 
 # Build desktop app
 echo -e "${BLUE}🖥️  Building desktop app...${NC}"
-cd screenjournal/apps/desktop
+cd screenrecord/apps/desktop
 if [ ! -d node_modules ]; then
     echo -e "${YELLOW}📦 Installing desktop app dependencies...${NC}"
     npm install
@@ -183,11 +183,11 @@ if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ Desktop app built successfully${NC}"
     # Tauri build output location varies by OS
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        echo -e "   Output: screenjournal/apps/desktop/src-tauri/target/release/bundle/${NC}"
+        echo -e "   Output: screenrecord/apps/desktop/src-tauri/target/release/bundle/${NC}"
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        echo -e "   Output: screenjournal/apps/desktop/src-tauri/target/release/bundle/${NC}"
+        echo -e "   Output: screenrecord/apps/desktop/src-tauri/target/release/bundle/${NC}"
     elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
-        echo -e "   Output: screenjournal/apps/desktop/src-tauri/target/release/bundle/${NC}"
+        echo -e "   Output: screenrecord/apps/desktop/src-tauri/target/release/bundle/${NC}"
     fi
 else
     echo -e "${RED}❌ Failed to build desktop app${NC}"
@@ -261,9 +261,9 @@ echo ""
 
 # Create a README for the build
 cat > "$BUILD_DIR/README.md" << EOF
-# ScreenJournal Productivity Tracker - Built Distribution
+# ScreenRecord Productivity Tracker - Built Distribution
 
-This directory contains the built executables and assets for the ScreenJournal system.
+This directory contains the built executables and assets for the ScreenRecord system.
 
 ## Contents
 
@@ -291,7 +291,7 @@ Use the \`run-built.sh\` script from the project root to start all services.
 ## Notes
 
 - The frontend build artifacts remain in \`sj-tracker-frontend/.next\`
-- The desktop app build artifacts are in \`screenjournal/apps/desktop/src-tauri/target/release/bundle/\`
+- The desktop app build artifacts are in \`screenrecord/apps/desktop/src-tauri/target/release/bundle/\`
 - Python dependencies are bundled in \`sj-tracker-chat-agent-venv/\`
 EOF
 
