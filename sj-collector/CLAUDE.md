@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ScreenJournal Collector is a Go-based WebSocket service that streams time-series data to InfluxDB 3.x. It features JWT authentication and automatically tags metrics with user and organization metadata.
+ScreenRecord Collector is a Go-based WebSocket service that streams time-series data to InfluxDB 3.x. It features JWT authentication and automatically tags metrics with user and organization metadata.
 
 ## Common Commands
 

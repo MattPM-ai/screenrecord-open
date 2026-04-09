@@ -1,4 +1,4 @@
-# Technical Specification: ScreenJournal Tracker Report Backend
+# Technical Specification: ScreenRecord Tracker Report Backend
 
 ## Project Overview
 

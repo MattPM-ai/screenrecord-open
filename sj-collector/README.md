@@ -1,4 +1,4 @@
-# ScreenJournal Collector
+# ScreenRecord Collector
 
 A high-performance Go service for streaming time-series data to InfluxDB with WebSocket support and JWT authentication.
 
@@ -136,7 +136,7 @@ Create a `.env` file based on `.env.example`:
 |----------|-------------|---------|
 | `SERVER_HOST` | Server bind address | `0.0.0.0` |
 | `SERVER_PORT` | Server port | `8080` |
-| `JWT_SECRET` | Secret key for signing JWT tokens (must match screenjournal-backend JWT_SECRET for backend token validation) | `your-secret-key-change-in-production` |
+| `JWT_SECRET` | Secret key for signing JWT tokens (must match screenrecord-backend JWT_SECRET for backend token validation) | `your-secret-key-change-in-production` |
 | `INFLUXDB_URL` | InfluxDB instance URL | Required |
 | `INFLUXDB_TOKEN` | InfluxDB authentication token | Required |
 | `INFLUXDB_DATABASE` | InfluxDB database name | Required |
@@ -168,11 +168,11 @@ Authorization: Bearer <backend-jwt-token>
 Content-Type: application/json
 ```
 
-Generates a JWT token for the authenticated user and organization. This endpoint is protected and requires a valid JWT token from screenjournal-backend (shared JWT_SECRET).
+Generates a JWT token for the authenticated user and organization. This endpoint is protected and requires a valid JWT token from screenrecord-backend (shared JWT_SECRET).
 
 **Authentication:**
-- Requires a valid JWT token from screenjournal-backend in the `Authorization` header
-- The token must be signed with the same `JWT_SECRET` used by screenjournal-backend
+- Requires a valid JWT token from screenrecord-backend in the `Authorization` header
+- The token must be signed with the same `JWT_SECRET` used by screenrecord-backend
 - Token structure: `{ userId: string, email: string, iat: number, exp: number }`
 - **Security**: The `user_id` in the request body must match the `userId` from the authenticated backend token
 
@@ -340,7 +340,7 @@ go test -cover ./...
 
 ## Production Considerations
 
-- Change `JWT_SECRET` to a strong, random value (must match screenjournal-backend JWT_SECRET)
+- Change `JWT_SECRET` to a strong, random value (must match screenrecord-backend JWT_SECRET)
 - Configure `CheckOrigin` in WebSocket upgrader for CORS
 - Add rate limiting for endpoints
 - Implement proper logging (structured logging)

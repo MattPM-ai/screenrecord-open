@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Run script for built ScreenJournal Productivity Tracker system
+# Run script for built ScreenRecord Productivity Tracker system
 # This script starts all services using the built executables from build.sh
 
 set -e
@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
-echo -e "${GREEN}🚀 Starting ScreenJournal Productivity Tracker System (Built Version)${NC}"
+echo -e "${GREEN}🚀 Starting ScreenRecord Productivity Tracker System (Built Version)${NC}"
 echo ""
 
 # Function to check if a command exists
@@ -129,8 +129,8 @@ if [ "$USE_DOCKER" = "true" ]; then
     echo -e "${YELLOW}🐳 Starting Docker services (MongoDB, InfluxDB)...${NC}"
     
     # Check if containers already exist and are running
-    if docker ps --format '{{.Names}}' | grep -q "^screenjournal-mongodb$" && \
-       docker ps --format '{{.Names}}' | grep -q "^screenjournal-influxdb$"; then
+    if docker ps --format '{{.Names}}' | grep -q "^screenrecord-mongodb$" && \
+       docker ps --format '{{.Names}}' | grep -q "^screenrecord-influxdb$"; then
         echo -e "${GREEN}✅ Database containers already running${NC}"
     else
         docker-compose up -d
@@ -141,13 +141,13 @@ if [ "$USE_DOCKER" = "true" ]; then
     # Check if MongoDB is ready
     echo -e "${YELLOW}🔍 Checking MongoDB...${NC}"
     for i in {1..30}; do
-        if docker exec screenjournal-mongodb mongosh --eval "db.adminCommand('ping')" --quiet >/dev/null 2>&1; then
+        if docker exec screenrecord-mongodb mongosh --eval "db.adminCommand('ping')" --quiet >/dev/null 2>&1; then
             echo -e "${GREEN}✅ MongoDB is ready${NC}"
             break
         fi
         if [ $i -eq 30 ]; then
             echo -e "${RED}❌ MongoDB failed to start${NC}"
-            echo -e "${YELLOW}   Check logs with: docker logs screenjournal-mongodb${NC}"
+            echo -e "${YELLOW}   Check logs with: docker logs screenrecord-mongodb${NC}"
             exit 1
         fi
         sleep 1
@@ -162,7 +162,7 @@ if [ "$USE_DOCKER" = "true" ]; then
         fi
         if [ $i -eq 30 ]; then
             echo -e "${RED}❌ InfluxDB failed to start${NC}"
-            echo -e "${YELLOW}   Check logs with: docker logs screenjournal-influxdb${NC}"
+            echo -e "${YELLOW}   Check logs with: docker logs screenrecord-influxdb${NC}"
             exit 1
         fi
         sleep 1
@@ -204,21 +204,21 @@ SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
 JWT_SECRET=your-secret-key-change-in-production
 INFLUXDB2_URL=http://localhost:8086
-INFLUXDB2_TOKEN=screenjournal-admin-token-change-in-production
-INFLUXDB2_ORG=screenjournal-org
-INFLUXDB2_BUCKET=screenjournal-metrics
+INFLUXDB2_TOKEN=screenrecord-admin-token-change-in-production
+INFLUXDB2_ORG=screenrecord-org
+INFLUXDB2_BUCKET=screenrecord-metrics
 STORAGE_BASE_PATH=./storage
 STORAGE_BASE_URL=http://localhost:8080/storage
 EOF
     # Update existing .env file to match docker-compose defaults if it exists
     if [ -f .env ]; then
         # Update InfluxDB settings to match docker-compose.yml defaults
-        sed -i.bak 's/^INFLUXDB2_ORG=.*/INFLUXDB2_ORG=screenjournal-org/' .env
-        sed -i.bak 's/^INFLUXDB2_BUCKET=.*/INFLUXDB2_BUCKET=screenjournal-metrics/' .env
-        sed -i.bak 's/^INFLUXDB2_TOKEN=.*/INFLUXDB2_TOKEN=screenjournal-admin-token-change-in-production/' .env
+        sed -i.bak 's/^INFLUXDB2_ORG=.*/INFLUXDB2_ORG=screenrecord-org/' .env
+        sed -i.bak 's/^INFLUXDB2_BUCKET=.*/INFLUXDB2_BUCKET=screenrecord-metrics/' .env
+        sed -i.bak 's/^INFLUXDB2_TOKEN=.*/INFLUXDB2_TOKEN=screenrecord-admin-token-change-in-production/' .env
         sed -i.bak 's/^INFLUXDB2_URL=.*/INFLUXDB2_URL=http:\/\/localhost:8086/' .env
         # Also update any old bucket names
-        sed -i.bak 's/matt-metrics/screenjournal-metrics/g' .env
+        sed -i.bak 's/matt-metrics/screenrecord-metrics/g' .env
         rm -f .env.bak
     fi
 fi
@@ -275,9 +275,9 @@ if [ ! -f .env ]; then
 PORT=8085
 HOST=0.0.0.0
 INFLUXDB2_URL=http://localhost:8086
-INFLUXDB2_TOKEN=screenjournal-admin-token-change-in-production
-INFLUXDB2_ORG=screenjournal-org
-INFLUXDB2_BUCKET=screenjournal-metrics
+INFLUXDB2_TOKEN=screenrecord-admin-token-change-in-production
+INFLUXDB2_ORG=screenrecord-org
+INFLUXDB2_BUCKET=screenrecord-metrics
 MONGODB_HOST=localhost
 MONGODB_PORT=27017
 MONGODB_DATABASE=reports
@@ -290,9 +290,9 @@ fi
 # Update existing .env file to match docker-compose defaults if it exists
 if [ -f .env ]; then
     # Update InfluxDB settings to match docker-compose.yml defaults
-    sed -i.bak 's/^INFLUXDB2_ORG=.*/INFLUXDB2_ORG=screenjournal-org/' .env
-    sed -i.bak 's/^INFLUXDB2_BUCKET=.*/INFLUXDB2_BUCKET=screenjournal-metrics/' .env
-    sed -i.bak 's/^INFLUXDB2_TOKEN=.*/INFLUXDB2_TOKEN=screenjournal-admin-token-change-in-production/' .env
+    sed -i.bak 's/^INFLUXDB2_ORG=.*/INFLUXDB2_ORG=screenrecord-org/' .env
+    sed -i.bak 's/^INFLUXDB2_BUCKET=.*/INFLUXDB2_BUCKET=screenrecord-metrics/' .env
+    sed -i.bak 's/^INFLUXDB2_TOKEN=.*/INFLUXDB2_TOKEN=screenrecord-admin-token-change-in-production/' .env
     sed -i.bak 's/^INFLUXDB2_URL=.*/INFLUXDB2_URL=http:\/\/localhost:8086/' .env
     # Update MongoDB settings
     sed -i.bak 's/^MONGODB_DATABASE=.*/MONGODB_DATABASE=reports/' .env
@@ -358,7 +358,7 @@ sleep 5
 echo -e "${YELLOW}🖥️  Desktop app${NC}"
 echo -e "${YELLOW}   The desktop app is built as a standalone application${NC}"
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    DESKTOP_APP_PATH="screenjournal/apps/desktop/src-tauri/target/release/bundle/macos"
+    DESKTOP_APP_PATH="screenrecord/apps/desktop/src-tauri/target/release/bundle/macos"
     if [ -d "$DESKTOP_APP_PATH" ]; then
         echo -e "${GREEN}   Desktop app available at: $DESKTOP_APP_PATH${NC}"
         echo -e "${YELLOW}   Launch it manually from the .app bundle${NC}"
@@ -366,7 +366,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
         echo -e "${YELLOW}   Desktop app not found. Run ./build.sh to build it.${NC}"
     fi
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    DESKTOP_APP_PATH="screenjournal/apps/desktop/src-tauri/target/release/bundle"
+    DESKTOP_APP_PATH="screenrecord/apps/desktop/src-tauri/target/release/bundle"
     if [ -d "$DESKTOP_APP_PATH" ]; then
         echo -e "${GREEN}   Desktop app available at: $DESKTOP_APP_PATH${NC}"
         echo -e "${YELLOW}   Launch it manually from the bundle directory${NC}"

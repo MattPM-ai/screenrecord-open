@@ -68,7 +68,7 @@ export default function UserMenu() {
   // Use default user if profile not loaded
   const displayUser = user || {
     id: 0,
-    email: 'local@screenjournal.local',
+    email: 'local@screenrecord.local',
     name: 'Local User',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),

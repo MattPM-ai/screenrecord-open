@@ -41,7 +41,7 @@ export interface OrganisationUser {
  */
 export const getDefaultUser = (): User => ({
   id: 0,
-  email: 'local@screenjournal.local',
+  email: 'local@screenrecord.local',
   name: 'Local User',
   account_id: 0,
   created_at: new Date().toISOString(),

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================================================
-# STOP SCRIPT - Stops all services for the ScreenJournal application
+# STOP SCRIPT - Stops all services for the ScreenRecord application
 # ============================================================================
 
 GREEN='\033[0;32m'
@@ -9,7 +9,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-echo -e "${GREEN}Stopping ScreenJournal services...${NC}\n"
+echo -e "${GREEN}Stopping ScreenRecord services...${NC}\n"
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 

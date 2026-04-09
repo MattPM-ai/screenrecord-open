@@ -1,8 +1,8 @@
 # ============================================================================
-# SCREENJOURNAL-OPEN - ROOT .gitignore
+# SCREENRECORD-OPEN - ROOT .gitignore
 # ============================================================================
 # 
-# This is the root-level .gitignore for the consolidated screenjournal-open
+# This is the root-level .gitignore for the consolidated screenrecord-open
 # repository. Individual components may have their own .gitignore files that
 # are preserved for component-specific ignores.
 #
@@ -120,7 +120,7 @@ __pycache__/
 # - sj-collector/.gitignore
 # - sj-tracker-frontend/.gitignore
 # - sj-tracker-report/.gitignore
-# - screenjournal/.gitignore
+# - screenrecord/.gitignore
 # ============================================================================
 
 

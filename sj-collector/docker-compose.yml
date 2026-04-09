@@ -1,5 +1,5 @@
 services:
-  # ScreenJournal Collector Service
+  # ScreenRecord Collector Service
   sj-collector:
     build:
       context: .

@@ -1,4 +1,4 @@
-# Research Notes - ScreenJournal Tracker Report Backend
+# Research Notes - ScreenRecord Tracker Report Backend
 
 ## Database Schema
 
